@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSettings, getActiveRooms, createTask } from '@/lib/db'
 import { verifyWebhookSignature, createChatworkClient, type WebhookPayload } from '@/lib/chatwork'
-import { analyzeMessage } from '@/lib/gemini'
+import { analyzeMessage } from '@/lib/extractor'
 
 export async function POST(request: Request) {
   try {
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     console.log('[Webhook] Message:', event.body)
-    const analysis = await analyzeMessage(event.body)
+    const analysis = analyzeMessage(event.body)
     console.log('[Webhook] Analysis:', JSON.stringify(analysis))
 
     if (!analysis.isTask) {
