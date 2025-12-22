@@ -9,7 +9,7 @@ export type TaskAnalysis = {
 }
 
 export async function analyzeMessage(message: string): Promise<TaskAnalysis> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
   const prompt = `以下のチャットメッセージを分析し、これが依頼やタスクかどうかを判定してください。
 
