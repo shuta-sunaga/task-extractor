@@ -7,26 +7,42 @@ type Room = {
   room_id: string
   room_name: string
   is_active: boolean
+  source: 'chatwork' | 'teams'
 }
 
 type Settings = {
   chatwork_api_token: string
   webhook_token: string
-  has_token: boolean
+  teams_webhook_secret: string
+  has_chatwork_token: boolean
+  has_teams_secret: boolean
 }
 
+type Tab = 'chatwork' | 'teams'
+
 export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<Tab>('chatwork')
   const [settings, setSettings] = useState<Settings>({
     chatwork_api_token: '',
     webhook_token: '',
-    has_token: false,
+    teams_webhook_secret: '',
+    has_chatwork_token: false,
+    has_teams_secret: false,
   })
-  const [rooms, setRooms] = useState<Room[]>([])
+  const [chatworkRooms, setChatworkRooms] = useState<Room[]>([])
+  const [teamsRooms, setTeamsRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  // Chatwork用
   const [apiToken, setApiToken] = useState('')
   const [webhookToken, setWebhookToken] = useState('')
-  const [message, setMessage] = useState('')
+
+  // Teams用
+  const [teamsSecret, setTeamsSecret] = useState('')
+  const [newChannelId, setNewChannelId] = useState('')
+  const [newChannelName, setNewChannelName] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -34,9 +50,10 @@ export default function SettingsPage() {
 
   async function fetchData() {
     try {
-      const [settingsRes, roomsRes] = await Promise.all([
+      const [settingsRes, chatworkRoomsRes, teamsRoomsRes] = await Promise.all([
         fetch('/api/settings'),
-        fetch('/api/rooms'),
+        fetch('/api/rooms?source=chatwork'),
+        fetch('/api/rooms?source=teams'),
       ])
 
       if (settingsRes.ok) {
@@ -45,9 +62,14 @@ export default function SettingsPage() {
         setWebhookToken(data.webhook_token || '')
       }
 
-      if (roomsRes.ok) {
-        const data = await roomsRes.json()
-        setRooms(Array.isArray(data) ? data : [])
+      if (chatworkRoomsRes.ok) {
+        const data = await chatworkRoomsRes.json()
+        setChatworkRooms(Array.isArray(data) ? data : [])
+      }
+
+      if (teamsRoomsRes.ok) {
+        const data = await teamsRoomsRes.json()
+        setTeamsRooms(Array.isArray(data) ? data : [])
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -56,8 +78,8 @@ export default function SettingsPage() {
     }
   }
 
-  async function saveSettings() {
-    if (!apiToken && !settings.has_token) {
+  async function saveChatworkSettings() {
+    if (!apiToken && !settings.has_chatwork_token) {
       setMessage('APIトークンを入力してください')
       return
     }
@@ -76,7 +98,7 @@ export default function SettingsPage() {
       })
 
       if (res.ok) {
-        setMessage('設定を保存しました')
+        setMessage('Chatwork設定を保存しました')
         setApiToken('')
         fetchData()
       } else {
@@ -89,21 +111,106 @@ export default function SettingsPage() {
     }
   }
 
-  async function toggleRoom(roomId: string, isActive: boolean) {
+  async function saveTeamsSettings() {
+    if (!teamsSecret && !settings.has_teams_secret) {
+      setMessage('Webhookシークレットを入力してください')
+      return
+    }
+
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamsWebhookSecret: teamsSecret || undefined,
+        }),
+      })
+
+      if (res.ok) {
+        setMessage('Teams設定を保存しました')
+        setTeamsSecret('')
+        fetchData()
+      } else {
+        setMessage('保存に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function toggleRoom(roomId: string, isActive: boolean, source: 'chatwork' | 'teams') {
     try {
       const res = await fetch('/api/rooms', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId, isActive }),
+        body: JSON.stringify({ roomId, isActive, source }),
       })
 
       if (res.ok) {
-        setRooms(rooms.map(room =>
-          room.room_id === roomId ? { ...room, is_active: isActive } : room
-        ))
+        if (source === 'chatwork') {
+          setChatworkRooms(chatworkRooms.map(room =>
+            room.room_id === roomId ? { ...room, is_active: isActive } : room
+          ))
+        } else {
+          setTeamsRooms(teamsRooms.map(room =>
+            room.room_id === roomId ? { ...room, is_active: isActive } : room
+          ))
+        }
       }
     } catch (error) {
       console.error('Failed to update room:', error)
+    }
+  }
+
+  async function addTeamsChannel() {
+    if (!newChannelId || !newChannelName) {
+      setMessage('チャネルIDと名前を入力してください')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: newChannelId,
+          roomName: newChannelName,
+          source: 'teams',
+        }),
+      })
+
+      if (res.ok) {
+        setMessage('チャネルを追加しました')
+        setNewChannelId('')
+        setNewChannelName('')
+        fetchData()
+      } else {
+        setMessage('チャネルの追加に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    }
+  }
+
+  async function deleteTeamsChannel(roomId: string) {
+    try {
+      const res = await fetch(`/api/rooms?roomId=${encodeURIComponent(roomId)}&source=teams`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setMessage('チャネルを削除しました')
+        setTeamsRooms(teamsRooms.filter(room => room.room_id !== roomId))
+      } else {
+        setMessage('削除に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
     }
   }
 
@@ -120,8 +227,12 @@ export default function SettingsPage() {
     }
   }
 
-  const webhookUrl = typeof window !== 'undefined'
+  const chatworkWebhookUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/api/webhook/chatwork`
+    : ''
+
+  const teamsWebhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/webhook/teams`
     : ''
 
   if (loading) {
@@ -133,8 +244,16 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-900">設定</h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">設定</h1>
+        <button
+          onClick={initDatabase}
+          className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+        >
+          DB初期化
+        </button>
+      </div>
 
       {message && (
         <div className={`p-4 rounded-lg ${
@@ -146,127 +265,288 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* DB初期化 */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">データベース</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          初回利用時や、テーブルが存在しない場合は初期化を実行してください。
-        </p>
-        <button
-          onClick={initDatabase}
-          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-        >
-          データベースを初期化
-        </button>
-      </div>
-
-      {/* Chatwork API設定 */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Chatwork API設定</h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              APIトークン
-            </label>
-            {settings.has_token && (
-              <p className="text-sm text-green-600 mb-2">
-                現在のトークン: {settings.chatwork_api_token}
-              </p>
-            )}
-            <input
-              type="password"
-              value={apiToken}
-              onChange={e => setApiToken(e.target.value)}
-              placeholder={settings.has_token ? '新しいトークンを入力（変更する場合）' : 'APIトークンを入力'}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Chatwork管理画面 → サービス連携 → APIトークン から取得できます
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Webhookトークン
-            </label>
-            <input
-              type="text"
-              value={webhookToken}
-              onChange={e => setWebhookToken(e.target.value)}
-              placeholder="Webhook設定画面のトークンを入力"
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Chatwork Webhook編集画面で表示されるトークンを入力してください
-            </p>
-          </div>
-
+      {/* タブナビゲーション */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-4">
           <button
-            onClick={saveSettings}
-            disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            onClick={() => setActiveTab('chatwork')}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'chatwork'
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
           >
-            {saving ? '保存中...' : '設定を保存'}
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              Chatwork
+            </span>
           </button>
-        </div>
-      </div>
-
-      {/* Webhook URL */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Webhook URL</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          このURLをChatworkのWebhook設定画面に登録してください。
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={webhookUrl}
-            readOnly
-            className="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
-          />
           <button
-            onClick={() => {
-              navigator.clipboard.writeText(webhookUrl)
-              setMessage('URLをコピーしました')
-            }}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+            onClick={() => setActiveTab('teams')}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'teams'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
           >
-            コピー
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+              Microsoft Teams
+            </span>
           </button>
-        </div>
+        </nav>
       </div>
 
-      {/* 監視ルーム設定 */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">監視するルーム</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          タスクを抽出したいルームにチェックを入れてください。
-        </p>
+      {/* Chatwork タブ */}
+      {activeTab === 'chatwork' && (
+        <div className="space-y-6">
+          {/* Chatwork API設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Chatwork API設定</h2>
 
-        {rooms.length === 0 ? (
-          <p className="text-gray-500">
-            ルームがありません。APIトークンを設定して保存すると、ルーム一覧が表示されます。
-          </p>
-        ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {rooms.map(room => (
-              <label
-                key={room.room_id}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
-              >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  APIトークン
+                </label>
+                {settings.has_chatwork_token && (
+                  <p className="text-sm text-green-600 mb-2">
+                    現在のトークン: {settings.chatwork_api_token}
+                  </p>
+                )}
                 <input
-                  type="checkbox"
-                  checked={room.is_active}
-                  onChange={e => toggleRoom(room.room_id, e.target.checked)}
-                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                  type="password"
+                  value={apiToken}
+                  onChange={e => setApiToken(e.target.value)}
+                  placeholder={settings.has_chatwork_token ? '新しいトークンを入力（変更する場合）' : 'APIトークンを入力'}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 />
-                <span className="text-gray-900">{room.room_name}</span>
-              </label>
-            ))}
+                <p className="text-sm text-gray-500 mt-1">
+                  Chatwork管理画面 → サービス連携 → APIトークン から取得できます
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Webhookトークン
+                </label>
+                <input
+                  type="text"
+                  value={webhookToken}
+                  onChange={e => setWebhookToken(e.target.value)}
+                  placeholder="Webhook設定画面のトークンを入力"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Chatwork Webhook編集画面で表示されるトークンを入力してください
+                </p>
+              </div>
+
+              <button
+                onClick={saveChatworkSettings}
+                disabled={saving}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {saving ? '保存中...' : '設定を保存'}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Webhook URL */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Webhook URL</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              このURLをChatworkのWebhook設定画面に登録してください。
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatworkWebhookUrl}
+                readOnly
+                className="flex-1 px-4 py-2 border rounded-lg bg-gray-50 text-sm"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(chatworkWebhookUrl)
+                  setMessage('URLをコピーしました')
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                コピー
+              </button>
+            </div>
+          </div>
+
+          {/* 監視ルーム設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">監視するルーム</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              タスクを抽出したいルームにチェックを入れてください。
+            </p>
+
+            {chatworkRooms.length === 0 ? (
+              <p className="text-gray-500">
+                ルームがありません。APIトークンを設定して保存すると、ルーム一覧が表示されます。
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {chatworkRooms.map(room => (
+                  <label
+                    key={room.room_id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={room.is_active}
+                      onChange={e => toggleRoom(room.room_id, e.target.checked, 'chatwork')}
+                      className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                    />
+                    <span className="text-gray-900">{room.room_name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Teams タブ */}
+      {activeTab === 'teams' && (
+        <div className="space-y-6">
+          {/* Teams Webhook設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Teams Webhook設定</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Webhookシークレット
+                </label>
+                {settings.has_teams_secret && (
+                  <p className="text-sm text-purple-600 mb-2">
+                    現在のシークレット: {settings.teams_webhook_secret}
+                  </p>
+                )}
+                <input
+                  type="password"
+                  value={teamsSecret}
+                  onChange={e => setTeamsSecret(e.target.value)}
+                  placeholder={settings.has_teams_secret ? '新しいシークレットを入力（変更する場合）' : 'シークレットを入力'}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  TeamsでOutgoing Webhook作成時に表示されるセキュリティトークンを入力してください
+                </p>
+              </div>
+
+              <button
+                onClick={saveTeamsSettings}
+                disabled={saving}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {saving ? '保存中...' : '設定を保存'}
+              </button>
+            </div>
+          </div>
+
+          {/* Webhook URL */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Webhook URL</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              このURLをTeamsのOutgoing Webhook設定に登録してください。
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={teamsWebhookUrl}
+                readOnly
+                className="flex-1 px-4 py-2 border rounded-lg bg-gray-50 text-sm"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(teamsWebhookUrl)
+                  setMessage('URLをコピーしました')
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                コピー
+              </button>
+            </div>
+          </div>
+
+          {/* チャネル手動登録 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">チャネルを登録</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              監視したいTeamsチャネルのIDと名前を入力して登録してください。
+            </p>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newChannelId}
+                onChange={e => setNewChannelId(e.target.value)}
+                placeholder="チャネルID（conversation.id）"
+                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              />
+              <input
+                type="text"
+                value={newChannelName}
+                onChange={e => setNewChannelName(e.target.value)}
+                placeholder="チャネル名"
+                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              />
+              <button
+                onClick={addTeamsChannel}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                追加
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 mb-4">
+              チャネルIDはWebhookの初回受信時にログで確認できます。
+            </p>
+          </div>
+
+          {/* 監視チャネル設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">監視するチャネル</h2>
+
+            {teamsRooms.length === 0 ? (
+              <p className="text-gray-500">
+                チャネルがありません。上のフォームからチャネルを追加してください。
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {teamsRooms.map(room => (
+                  <div
+                    key={room.room_id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={room.is_active}
+                      onChange={e => toggleRoom(room.room_id, e.target.checked, 'teams')}
+                      className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+                    />
+                    <span className="flex-1 text-gray-900">{room.room_name}</span>
+                    <span className="text-xs text-gray-400 truncate max-w-xs" title={room.room_id}>
+                      {room.room_id.slice(0, 20)}...
+                    </span>
+                    <button
+                      onClick={() => deleteTeamsChannel(room.room_id)}
+                      className="px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                    >
+                      削除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

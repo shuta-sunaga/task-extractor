@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSettings, saveSettings } from '@/lib/db'
+import { getSettings, saveSettings, saveTeamsSettings } from '@/lib/db'
 
 export async function GET() {
   try {
@@ -8,16 +8,23 @@ export async function GET() {
       return NextResponse.json({
         chatwork_api_token: '',
         webhook_token: '',
+        teams_webhook_secret: '',
+        has_chatwork_token: false,
+        has_teams_secret: false,
       })
     }
 
-    // APIトークンはマスクして返す
+    // トークンはマスクして返す
     return NextResponse.json({
       chatwork_api_token: settings.chatwork_api_token
         ? '****' + settings.chatwork_api_token.slice(-4)
         : '',
       webhook_token: settings.webhook_token || '',
-      has_token: Boolean(settings.chatwork_api_token),
+      teams_webhook_secret: settings.teams_webhook_secret
+        ? '****' + settings.teams_webhook_secret.slice(-4)
+        : '',
+      has_chatwork_token: Boolean(settings.chatwork_api_token),
+      has_teams_secret: Boolean(settings.teams_webhook_secret),
     })
   } catch (error) {
     console.error('Get settings error:', error)
@@ -31,9 +38,22 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { chatworkApiToken, webhookToken } = body
+    const { chatworkApiToken, webhookToken, teamsWebhookSecret } = body
 
-    await saveSettings(chatworkApiToken, webhookToken)
+    // Chatwork設定の保存
+    if (chatworkApiToken !== undefined || webhookToken !== undefined) {
+      await saveSettings(
+        chatworkApiToken || '',
+        webhookToken || '',
+        teamsWebhookSecret
+      )
+    }
+
+    // Teams設定のみの保存
+    if (teamsWebhookSecret !== undefined && chatworkApiToken === undefined) {
+      await saveTeamsSettings(teamsWebhookSecret)
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Save settings error:', error)
