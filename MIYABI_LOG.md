@@ -121,6 +121,48 @@
 
 ---
 
+## 2025-12-23
+
+### セッション 6
+
+#### 指示
+- ヘッダーの上下余白を増やす
+- 設定ページに「全般」タブを追加
+- メール通知機能を実装（タスク作成/完了/削除時）
+
+#### 実施内容
+1. **ヘッダー余白調整**: `py-3` → `py-8`
+
+2. **DBスキーマ拡張** (`lib/db.ts`)
+   - `notification_emails`: 通知先メールアドレス（カンマ区切り）
+   - `notify_on_create`, `notify_on_complete`, `notify_on_delete`: 通知ON/OFF
+
+3. **メール送信ライブラリ** (`lib/email.ts`) - 新規
+   - Resend使用（遅延初期化でビルドエラー回避）
+   - HTMLメールテンプレート（たすきゃっちゃーブランド）
+   - 通知設定に応じた送信制御
+
+4. **設定API更新** (`app/api/settings/route.ts`)
+   - 通知設定の取得/保存対応
+
+5. **設定画面に「全般」タブ追加** (`app/settings/page.tsx`)
+   - メールアドレス管理（追加/削除）
+   - 通知タイミング設定（チェックボックス）
+   - Resend設定案内
+
+6. **タスク操作時にメール通知を統合**
+   - `app/api/webhook/chatwork/route.ts`: 作成通知
+   - `app/api/webhook/teams/route.ts`: 作成通知
+   - `app/api/tasks/[id]/route.ts`: 完了/削除通知
+
+#### 備考
+- 環境変数 `RESEND_API_KEY` が必要
+- Resend無料枠: 3000通/月
+- メール未設定でもエラーにならない（スキップ）
+- デプロイ後、Vercel環境変数にRESEND_API_KEYを追加
+
+---
+
 <!--
 使い方:
 - 新しいセッションごとに「### セッション N」を追加
