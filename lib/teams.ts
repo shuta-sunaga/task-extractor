@@ -111,12 +111,20 @@ export function stripMention(text: string): string {
 }
 
 /**
+ * conversation.id から ;messageid=xxx 部分を除去
+ */
+export function normalizeConversationId(conversationId: string): string {
+  // "19:xxx@thread.tacv2;messageid=123" → "19:xxx@thread.tacv2"
+  return conversationId.split(';')[0]
+}
+
+/**
  * Teams ペイロードを正規化されたメッセージ形式に変換
  */
 export function parseTeamsPayload(payload: TeamsWebhookPayload): TeamsMessage {
   return {
     activityId: payload.id,
-    conversationId: payload.conversation.id,
+    conversationId: normalizeConversationId(payload.conversation.id),
     text: stripMention(payload.text || ''),
     senderName: payload.from?.name || 'Unknown',
     teamId: payload.channelData?.teamsTeamId,
