@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import Logo from './components/Logo'
 
 export const metadata: Metadata = {
-  title: 'Task Extractor',
-  description: 'Chatworkのメッセージから課題・タスクを自動抽出',
+  title: 'タスキャッチャー',
+  description: 'ChatworkやTeamsのメッセージからタスクを自動キャッチ！',
 }
 
 export default function RootLayout({
@@ -14,17 +15,26 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className="bg-gray-50 min-h-screen">
-        <header className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 py-4">
+        <header className="bg-gradient-to-r from-orange-400 via-pink-500 to-purple-500 shadow-lg">
+          <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex justify-between items-center">
-              <a href="/" className="text-xl font-bold text-gray-900">
-                Task Extractor
+              <a href="/" className="flex items-center gap-3 group">
+                <Logo className="w-10 h-10 drop-shadow-md group-hover:scale-110 transition-transform" />
+                <span className="text-2xl font-bold text-white drop-shadow-md">
+                  タスキャッチャー
+                </span>
               </a>
               <nav className="flex gap-4">
-                <a href="/" className="text-gray-600 hover:text-gray-900">
+                <a
+                  href="/"
+                  className="text-white/90 hover:text-white font-medium transition-colors"
+                >
                   ダッシュボード
                 </a>
-                <a href="/settings" className="text-gray-600 hover:text-gray-900">
+                <a
+                  href="/settings"
+                  className="text-white/90 hover:text-white font-medium transition-colors"
+                >
                   設定
                 </a>
               </nav>
