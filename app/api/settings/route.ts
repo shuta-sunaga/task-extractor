@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getSettings, saveSettings, saveTeamsSettings } from '@/lib/db'
+import { getSettings, saveSettings, saveTeamsSettings, getNotificationSettings, saveNotificationSettings } from '@/lib/db'
 
 export async function GET() {
   try {
     const settings = await getSettings()
+    const notificationSettings = await getNotificationSettings()
+
     if (!settings) {
       return NextResponse.json({
         chatwork_api_token: '',
@@ -11,6 +13,10 @@ export async function GET() {
         teams_webhook_secret: '',
         has_chatwork_token: false,
         has_teams_secret: false,
+        notification_emails: notificationSettings.notification_emails,
+        notify_on_create: notificationSettings.notify_on_create,
+        notify_on_complete: notificationSettings.notify_on_complete,
+        notify_on_delete: notificationSettings.notify_on_delete,
       })
     }
 
@@ -25,6 +31,10 @@ export async function GET() {
         : '',
       has_chatwork_token: Boolean(settings.chatwork_api_token),
       has_teams_secret: Boolean(settings.teams_webhook_secret),
+      notification_emails: notificationSettings.notification_emails,
+      notify_on_create: notificationSettings.notify_on_create,
+      notify_on_complete: notificationSettings.notify_on_complete,
+      notify_on_delete: notificationSettings.notify_on_delete,
     })
   } catch (error) {
     console.error('Get settings error:', error)
@@ -38,7 +48,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { chatworkApiToken, webhookToken, teamsWebhookSecret } = body
+    const {
+      chatworkApiToken,
+      webhookToken,
+      teamsWebhookSecret,
+      notificationEmails,
+      notifyOnCreate,
+      notifyOnComplete,
+      notifyOnDelete,
+    } = body
 
     // Chatwork設定の保存
     if (chatworkApiToken !== undefined || webhookToken !== undefined) {
@@ -52,6 +70,16 @@ export async function POST(request: Request) {
     // Teams設定のみの保存
     if (teamsWebhookSecret !== undefined && chatworkApiToken === undefined) {
       await saveTeamsSettings(teamsWebhookSecret)
+    }
+
+    // 通知設定の保存
+    if (notificationEmails !== undefined) {
+      await saveNotificationSettings({
+        notification_emails: notificationEmails,
+        notify_on_create: notifyOnCreate ?? true,
+        notify_on_complete: notifyOnComplete ?? true,
+        notify_on_delete: notifyOnDelete ?? false,
+      })
     }
 
     return NextResponse.json({ success: true })

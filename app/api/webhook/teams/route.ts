@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSettings, getActiveRoomsBySource, createTask, getTaskByMessageId } from '@/lib/db'
 import { verifyTeamsSignature, parseTeamsPayload, type TeamsWebhookPayload } from '@/lib/teams'
 import { analyzeMessage } from '@/lib/extractor'
+import { sendTaskNotification } from '@/lib/email'
 
 // シンプルな応答（Botの返信として表示される）
 function simpleResponse(text: string = '✅') {
@@ -90,6 +91,17 @@ export async function POST(request: Request) {
     })
 
     console.log('[Teams Webhook] Task created:', task.id)
+
+    // 作成通知を送信（非同期）
+    sendTaskNotification({
+      id: task.id,
+      content: task.content,
+      sender_name: task.sender_name,
+      source: 'teams',
+      priority: task.priority,
+    }, 'create').catch(err => {
+      console.error('[Email] Failed to send create notification:', err)
+    })
 
     // レスポンス（5秒以内に返す必要がある）
     return simpleResponse('タスクの登録が完了しました。\nhttps://task-extractor-ten.vercel.app/')

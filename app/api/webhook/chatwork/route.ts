@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSettings, getActiveRooms, createTask } from '@/lib/db'
 import { verifyWebhookSignature, createChatworkClient, type WebhookPayload } from '@/lib/chatwork'
 import { analyzeMessage } from '@/lib/extractor'
+import { sendTaskNotification } from '@/lib/email'
 
 export async function POST(request: Request) {
   try {
@@ -74,6 +75,18 @@ export async function POST(request: Request) {
     })
 
     console.log('[Webhook] Task created:', task.id)
+
+    // 作成通知を送信（非同期）
+    sendTaskNotification({
+      id: task.id,
+      content: task.content,
+      sender_name: task.sender_name,
+      source: 'chatwork',
+      priority: task.priority,
+    }, 'create').catch(err => {
+      console.error('[Email] Failed to send create notification:', err)
+    })
+
     return NextResponse.json({ success: true, taskId: task.id })
   } catch (error) {
     console.error('[Webhook] Error:', error)

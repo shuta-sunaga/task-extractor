@@ -16,18 +16,26 @@ type Settings = {
   teams_webhook_secret: string
   has_chatwork_token: boolean
   has_teams_secret: boolean
+  notification_emails: string[]
+  notify_on_create: boolean
+  notify_on_complete: boolean
+  notify_on_delete: boolean
 }
 
-type Tab = 'chatwork' | 'teams'
+type Tab = 'general' | 'chatwork' | 'teams'
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('chatwork')
+  const [activeTab, setActiveTab] = useState<Tab>('general')
   const [settings, setSettings] = useState<Settings>({
     chatwork_api_token: '',
     webhook_token: '',
     teams_webhook_secret: '',
     has_chatwork_token: false,
     has_teams_secret: false,
+    notification_emails: [],
+    notify_on_create: true,
+    notify_on_complete: true,
+    notify_on_delete: false,
   })
   const [chatworkRooms, setChatworkRooms] = useState<Room[]>([])
   const [teamsRooms, setTeamsRooms] = useState<Room[]>([])
@@ -43,6 +51,13 @@ export default function SettingsPage() {
   const [teamsSecret, setTeamsSecret] = useState('')
   const [newChannelId, setNewChannelId] = useState('')
   const [newChannelName, setNewChannelName] = useState('')
+
+  // 通知設定用
+  const [newEmail, setNewEmail] = useState('')
+  const [notificationEmails, setNotificationEmails] = useState<string[]>([])
+  const [notifyOnCreate, setNotifyOnCreate] = useState(true)
+  const [notifyOnComplete, setNotifyOnComplete] = useState(true)
+  const [notifyOnDelete, setNotifyOnDelete] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -60,6 +75,10 @@ export default function SettingsPage() {
         const data = await settingsRes.json()
         setSettings(data)
         setWebhookToken(data.webhook_token || '')
+        setNotificationEmails(data.notification_emails || [])
+        setNotifyOnCreate(data.notify_on_create ?? true)
+        setNotifyOnComplete(data.notify_on_complete ?? true)
+        setNotifyOnDelete(data.notify_on_delete ?? false)
       }
 
       if (chatworkRoomsRes.ok) {
@@ -214,6 +233,58 @@ export default function SettingsPage() {
     }
   }
 
+  function addEmail() {
+    const email = newEmail.trim()
+    if (!email) return
+
+    // 簡易的なメールアドレスバリデーション
+    if (!email.includes('@')) {
+      setMessage('有効なメールアドレスを入力してください')
+      return
+    }
+
+    if (notificationEmails.includes(email)) {
+      setMessage('このメールアドレスは既に追加されています')
+      return
+    }
+
+    setNotificationEmails([...notificationEmails, email])
+    setNewEmail('')
+  }
+
+  function removeEmail(email: string) {
+    setNotificationEmails(notificationEmails.filter(e => e !== email))
+  }
+
+  async function saveNotificationSettings() {
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notificationEmails,
+          notifyOnCreate,
+          notifyOnComplete,
+          notifyOnDelete,
+        }),
+      })
+
+      if (res.ok) {
+        setMessage('通知設定を保存しました')
+        fetchData()
+      } else {
+        setMessage('保存に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function initDatabase() {
     try {
       const res = await fetch('/api/init')
@@ -269,6 +340,19 @@ export default function SettingsPage() {
       <div className="border-b border-gray-200">
         <nav className="flex gap-4">
           <button
+            onClick={() => setActiveTab('general')}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'general'
+                ? 'border-teal-600 text-teal-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+              全般
+            </span>
+          </button>
+          <button
             onClick={() => setActiveTab('chatwork')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'chatwork'
@@ -296,6 +380,143 @@ export default function SettingsPage() {
           </button>
         </nav>
       </div>
+
+      {/* 全般タブ */}
+      {activeTab === 'general' && (
+        <div className="space-y-6">
+          {/* メール通知設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">メール通知設定</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              タスクの作成・完了・削除時にメールで通知を受け取ることができます。
+            </p>
+
+            <div className="space-y-6">
+              {/* メールアドレス追加 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  通知先メールアドレス
+                </label>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addEmail()}
+                    placeholder="example@email.com"
+                    className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                  <button
+                    onClick={addEmail}
+                    className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                  >
+                    追加
+                  </button>
+                </div>
+
+                {/* 登録済みメールアドレス一覧 */}
+                {notificationEmails.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    通知先メールアドレスが登録されていません
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {notificationEmails.map(email => (
+                      <div
+                        key={email}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <span className="text-gray-900">{email}</span>
+                        <button
+                          onClick={() => removeEmail(email)}
+                          className="text-red-600 hover:text-red-700 text-sm"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 通知タイミング設定 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  通知タイミング
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notifyOnCreate}
+                      onChange={e => setNotifyOnCreate(e.target.checked)}
+                      className="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
+                    />
+                    <div>
+                      <span className="text-gray-900">タスク作成時</span>
+                      <p className="text-sm text-gray-500">新しいタスクが登録されたときに通知</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notifyOnComplete}
+                      onChange={e => setNotifyOnComplete(e.target.checked)}
+                      className="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
+                    />
+                    <div>
+                      <span className="text-gray-900">タスク完了時</span>
+                      <p className="text-sm text-gray-500">タスクが完了になったときに通知</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notifyOnDelete}
+                      onChange={e => setNotifyOnDelete(e.target.checked)}
+                      className="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
+                    />
+                    <div>
+                      <span className="text-gray-900">タスク削除時</span>
+                      <p className="text-sm text-gray-500">タスクが削除されたときに通知</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <button
+                onClick={saveNotificationSettings}
+                disabled={saving}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                {saving ? '保存中...' : '設定を保存'}
+              </button>
+            </div>
+          </div>
+
+          {/* Resend設定案内 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">メール送信サービス設定</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              メール通知にはResendを使用しています。環境変数に以下を設定してください：
+            </p>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <code className="text-sm text-gray-800">RESEND_API_KEY=re_xxxxxxxxxx</code>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              <a
+                href="https://resend.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-teal-600 hover:underline"
+              >
+                Resend
+              </a>
+              で無料アカウントを作成し、APIキーを取得してください。
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Chatwork タブ */}
       {activeTab === 'chatwork' && (

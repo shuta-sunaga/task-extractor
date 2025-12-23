@@ -20,6 +20,24 @@ export async function initDatabase() {
     ADD COLUMN IF NOT EXISTS teams_webhook_secret TEXT
   `
 
+  // メール通知設定カラム追加
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS notification_emails TEXT
+  `
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS notify_on_create BOOLEAN DEFAULT true
+  `
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS notify_on_complete BOOLEAN DEFAULT true
+  `
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS notify_on_delete BOOLEAN DEFAULT false
+  `
+
   // Rooms テーブル
   await sql`
     CREATE TABLE IF NOT EXISTS rooms (
@@ -132,6 +150,58 @@ export async function saveTeamsSettings(teamsWebhookSecret: string) {
   }
 }
 
+// 通知設定
+export type NotificationSettings = {
+  notification_emails: string[]
+  notify_on_create: boolean
+  notify_on_complete: boolean
+  notify_on_delete: boolean
+}
+
+export async function getNotificationSettings(): Promise<NotificationSettings> {
+  const settings = await getSettings()
+  if (!settings) {
+    return {
+      notification_emails: [],
+      notify_on_create: true,
+      notify_on_complete: true,
+      notify_on_delete: false,
+    }
+  }
+
+  // notification_emails はカンマ区切りで保存
+  const emailsStr = settings.notification_emails || ''
+  const emails = emailsStr ? emailsStr.split(',').map((e: string) => e.trim()).filter(Boolean) : []
+
+  return {
+    notification_emails: emails,
+    notify_on_create: settings.notify_on_create ?? true,
+    notify_on_complete: settings.notify_on_complete ?? true,
+    notify_on_delete: settings.notify_on_delete ?? false,
+  }
+}
+
+export async function saveNotificationSettings(notificationSettings: NotificationSettings) {
+  const existing = await getSettings()
+  const emailsStr = notificationSettings.notification_emails.join(',')
+
+  if (existing) {
+    await sql`
+      UPDATE settings
+      SET notification_emails = ${emailsStr},
+          notify_on_create = ${notificationSettings.notify_on_create},
+          notify_on_complete = ${notificationSettings.notify_on_complete},
+          notify_on_delete = ${notificationSettings.notify_on_delete}
+      WHERE id = ${existing.id}
+    `
+  } else {
+    await sql`
+      INSERT INTO settings (notification_emails, notify_on_create, notify_on_complete, notify_on_delete)
+      VALUES (${emailsStr}, ${notificationSettings.notify_on_create}, ${notificationSettings.notify_on_complete}, ${notificationSettings.notify_on_delete})
+    `
+  }
+}
+
 // Rooms
 export async function getRooms() {
   const result = await sql`SELECT * FROM rooms ORDER BY source, room_name`
@@ -220,6 +290,13 @@ export async function getTasks() {
 export async function getTaskByMessageId(messageId: string, source: Source) {
   const result = await sql`
     SELECT * FROM tasks WHERE message_id = ${messageId} AND source = ${source} LIMIT 1
+  `
+  return result.rows[0] || null
+}
+
+export async function getTaskById(id: number) {
+  const result = await sql`
+    SELECT * FROM tasks WHERE id = ${id} LIMIT 1
   `
   return result.rows[0] || null
 }
