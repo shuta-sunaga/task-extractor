@@ -21,7 +21,7 @@ export default function RootLayout({
       </head>
       <body className="bg-gray-50 min-h-screen">
         <header className="bg-gradient-to-r from-teal-500 to-cyan-500 shadow-md">
-          <div className="max-w-7xl mx-auto px-4 py-5">
+          <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="flex justify-between items-center">
               <a
                 href="/"
