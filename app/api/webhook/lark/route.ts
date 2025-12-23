@@ -21,21 +21,31 @@ export async function POST(request: Request) {
     const signature = request.headers.get('X-Lark-Signature') || ''
 
     console.log('[Lark Webhook] Received request')
-
-    // 設定取得
-    const settings = await getSettings()
-    if (!settings?.lark_verification_token) {
-      console.error('[Lark Webhook] Verification token not configured')
-      return NextResponse.json({ error: 'Webhook not configured' }, { status: 400 })
-    }
+    console.log('[Lark Webhook] Raw body:', rawBody)
 
     let payload: LarkEventPayload = JSON.parse(rawBody)
 
+    // 設定取得
+    const settings = await getSettings()
+
     // 暗号化されている場合は復号
-    if (payload.encrypt && settings.lark_encrypt_key) {
+    if (payload.encrypt && settings?.lark_encrypt_key) {
       console.log('[Lark Webhook] Decrypting payload')
       const decrypted = decryptAES(payload.encrypt, settings.lark_encrypt_key)
       payload = JSON.parse(decrypted)
+      console.log('[Lark Webhook] Decrypted payload:', JSON.stringify(payload))
+    }
+
+    // URL検証チャレンジへの応答（最優先で処理）
+    if (isChallenge(payload)) {
+      console.log('[Lark Webhook] Challenge request, responding with:', payload.challenge)
+      return NextResponse.json(createChallengeResponse(payload.challenge!))
+    }
+
+    // 以降のイベント処理にはVerification Tokenが必要
+    if (!settings?.lark_verification_token) {
+      console.error('[Lark Webhook] Verification token not configured')
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 400 })
     }
 
     // 署名検証（暗号化キーがある場合）
@@ -50,12 +60,6 @@ export async function POST(request: Request) {
     if (!verifyToken(payload, settings.lark_verification_token)) {
       console.error('[Lark Webhook] Invalid token')
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    // URL検証チャレンジへの応答
-    if (isChallenge(payload)) {
-      console.log('[Lark Webhook] Challenge request, responding')
-      return NextResponse.json(createChallengeResponse(payload.challenge!))
     }
 
     // メッセージ受信イベント以外はスキップ

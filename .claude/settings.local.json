@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx miyabi)",
+      "Bash(npx miyabi --help:*)",
+      "WebSearch",
+      "WebFetch(domain:open.larksuite.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:open.larkoffice.com)"
+    ]
+  }
+}
