@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSettings, saveSettings, saveTeamsSettings, getNotificationSettings, saveNotificationSettings } from '@/lib/db'
+import { getSettings, saveSettings, saveTeamsSettings, saveLarkSettings, getNotificationSettings, saveNotificationSettings } from '@/lib/db'
 
 export async function GET() {
   try {
@@ -13,6 +13,9 @@ export async function GET() {
         teams_webhook_secret: '',
         has_chatwork_token: false,
         has_teams_secret: false,
+        lark_app_id: '',
+        lark_verification_token: '',
+        has_lark_settings: false,
         notification_emails: notificationSettings.notification_emails,
         notify_on_create: notificationSettings.notify_on_create,
         notify_on_complete: notificationSettings.notify_on_complete,
@@ -33,6 +36,11 @@ export async function GET() {
         : '',
       has_chatwork_token: Boolean(settings.chatwork_api_token),
       has_teams_secret: Boolean(settings.teams_webhook_secret),
+      lark_app_id: settings.lark_app_id || '',
+      lark_verification_token: settings.lark_verification_token
+        ? '****' + settings.lark_verification_token.slice(-4)
+        : '',
+      has_lark_settings: Boolean(settings.lark_app_id && settings.lark_verification_token),
       notification_emails: notificationSettings.notification_emails,
       notify_on_create: notificationSettings.notify_on_create,
       notify_on_complete: notificationSettings.notify_on_complete,
@@ -58,6 +66,10 @@ export async function POST(request: Request) {
       chatworkApiToken,
       webhookToken,
       teamsWebhookSecret,
+      larkAppId,
+      larkAppSecret,
+      larkVerificationToken,
+      larkEncryptKey,
       notificationEmails,
       notifyOnCreate,
       notifyOnComplete,
@@ -77,6 +89,16 @@ export async function POST(request: Request) {
     // Teams設定のみの保存
     if (teamsWebhookSecret !== undefined && chatworkApiToken === undefined) {
       await saveTeamsSettings(teamsWebhookSecret)
+    }
+
+    // Lark設定の保存
+    if (larkAppId !== undefined || larkAppSecret !== undefined || larkVerificationToken !== undefined || larkEncryptKey !== undefined) {
+      await saveLarkSettings({
+        appId: larkAppId,
+        appSecret: larkAppSecret,
+        verificationToken: larkVerificationToken,
+        encryptKey: larkEncryptKey,
+      })
     }
 
     // 通知設定の保存

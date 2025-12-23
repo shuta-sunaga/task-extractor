@@ -11,18 +11,20 @@ type Task = {
   sender_name: string
   status: 'pending' | 'in_progress' | 'completed'
   priority: 'high' | 'medium' | 'low'
-  source: 'chatwork' | 'teams'
+  source: 'chatwork' | 'teams' | 'lark'
   created_at: string
 }
 
 const sourceColors = {
   chatwork: 'bg-green-100 text-green-700',
   teams: 'bg-purple-100 text-purple-700',
+  lark: 'bg-blue-100 text-blue-700',
 }
 
 const sourceLabels = {
   chatwork: 'CW',
   teams: 'Teams',
+  lark: 'Lark',
 }
 
 const statusLabels = {
@@ -137,7 +139,7 @@ export default function Dashboard() {
       {filteredTasks.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
           {tasks.length === 0
-            ? 'タスクがありません。ChatworkやTeamsからメッセージを受信すると、ここに表示されます。'
+            ? 'タスクがありません。Chatwork、Teams、Larkからメッセージを受信すると、ここに表示されます。'
             : '該当するタスクがありません。'}
         </div>
       ) : (

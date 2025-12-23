@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres'
 
-export type Source = 'chatwork' | 'teams'
+export type Source = 'chatwork' | 'teams' | 'lark'
 
 // テーブル作成（初回のみ）+ マイグレーション
 export async function initDatabase() {
@@ -40,6 +40,24 @@ export async function initDatabase() {
   await sql`
     ALTER TABLE settings
     ADD COLUMN IF NOT EXISTS resend_api_key TEXT
+  `
+
+  // Lark設定カラム追加
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS lark_app_id TEXT
+  `
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS lark_app_secret TEXT
+  `
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS lark_verification_token TEXT
+  `
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS lark_encrypt_key TEXT
   `
 
   // Rooms テーブル
@@ -150,6 +168,30 @@ export async function saveTeamsSettings(teamsWebhookSecret: string) {
     await sql`
       INSERT INTO settings (teams_webhook_secret)
       VALUES (${teamsWebhookSecret})
+    `
+  }
+}
+
+export async function saveLarkSettings(larkSettings: {
+  appId?: string
+  appSecret?: string
+  verificationToken?: string
+  encryptKey?: string
+}) {
+  const existing = await getSettings()
+  if (existing) {
+    await sql`
+      UPDATE settings
+      SET lark_app_id = COALESCE(${larkSettings.appId || null}, lark_app_id),
+          lark_app_secret = COALESCE(${larkSettings.appSecret || null}, lark_app_secret),
+          lark_verification_token = COALESCE(${larkSettings.verificationToken || null}, lark_verification_token),
+          lark_encrypt_key = COALESCE(${larkSettings.encryptKey || null}, lark_encrypt_key)
+      WHERE id = ${existing.id}
+    `
+  } else {
+    await sql`
+      INSERT INTO settings (lark_app_id, lark_app_secret, lark_verification_token, lark_encrypt_key)
+      VALUES (${larkSettings.appId || null}, ${larkSettings.appSecret || null}, ${larkSettings.verificationToken || null}, ${larkSettings.encryptKey || null})
     `
   }
 }

@@ -17,7 +17,7 @@ export type TaskInfo = {
   id: number
   content: string
   sender_name: string
-  source: 'chatwork' | 'teams'
+  source: 'chatwork' | 'teams' | 'lark'
   priority: string
   status?: string
 }
@@ -33,6 +33,7 @@ const NOTIFICATION_SUBJECTS: Record<NotificationType, string> = {
 const SOURCE_LABELS: Record<string, string> = {
   chatwork: 'Chatwork',
   teams: 'Teams',
+  lark: 'Lark',
 }
 
 const PRIORITY_LABELS: Record<string, string> = {

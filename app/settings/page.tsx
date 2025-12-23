@@ -7,7 +7,7 @@ type Room = {
   room_id: string
   room_name: string
   is_active: boolean
-  source: 'chatwork' | 'teams'
+  source: 'chatwork' | 'teams' | 'lark'
 }
 
 type Settings = {
@@ -16,6 +16,9 @@ type Settings = {
   teams_webhook_secret: string
   has_chatwork_token: boolean
   has_teams_secret: boolean
+  lark_app_id: string
+  lark_verification_token: string
+  has_lark_settings: boolean
   notification_emails: string[]
   notify_on_create: boolean
   notify_on_complete: boolean
@@ -24,7 +27,7 @@ type Settings = {
   has_resend_key: boolean
 }
 
-type Tab = 'general' | 'chatwork' | 'teams'
+type Tab = 'general' | 'chatwork' | 'teams' | 'lark'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('general')
@@ -34,6 +37,9 @@ export default function SettingsPage() {
     teams_webhook_secret: '',
     has_chatwork_token: false,
     has_teams_secret: false,
+    lark_app_id: '',
+    lark_verification_token: '',
+    has_lark_settings: false,
     notification_emails: [],
     notify_on_create: true,
     notify_on_complete: true,
@@ -43,6 +49,7 @@ export default function SettingsPage() {
   })
   const [chatworkRooms, setChatworkRooms] = useState<Room[]>([])
   const [teamsRooms, setTeamsRooms] = useState<Room[]>([])
+  const [larkRooms, setLarkRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -55,6 +62,15 @@ export default function SettingsPage() {
   const [teamsSecret, setTeamsSecret] = useState('')
   const [newChannelId, setNewChannelId] = useState('')
   const [newChannelName, setNewChannelName] = useState('')
+
+  // Lark用
+  const [larkAppId, setLarkAppId] = useState('')
+  const [larkAppSecret, setLarkAppSecret] = useState('')
+  const [larkVerificationToken, setLarkVerificationToken] = useState('')
+  const [larkEncryptKey, setLarkEncryptKey] = useState('')
+  const [showLarkSecret, setShowLarkSecret] = useState(false)
+  const [newLarkChatId, setNewLarkChatId] = useState('')
+  const [newLarkChatName, setNewLarkChatName] = useState('')
 
   // 通知設定用
   const [newEmail, setNewEmail] = useState('')
@@ -71,10 +87,11 @@ export default function SettingsPage() {
 
   async function fetchData() {
     try {
-      const [settingsRes, chatworkRoomsRes, teamsRoomsRes] = await Promise.all([
+      const [settingsRes, chatworkRoomsRes, teamsRoomsRes, larkRoomsRes] = await Promise.all([
         fetch('/api/settings'),
         fetch('/api/rooms?source=chatwork'),
         fetch('/api/rooms?source=teams'),
+        fetch('/api/rooms?source=lark'),
       ])
 
       if (settingsRes.ok) {
@@ -95,6 +112,11 @@ export default function SettingsPage() {
       if (teamsRoomsRes.ok) {
         const data = await teamsRoomsRes.json()
         setTeamsRooms(Array.isArray(data) ? data : [])
+      }
+
+      if (larkRoomsRes.ok) {
+        const data = await larkRoomsRes.json()
+        setLarkRooms(Array.isArray(data) ? data : [])
       }
     } catch (error) {
       console.error('Failed to fetch data:', error)
@@ -168,7 +190,7 @@ export default function SettingsPage() {
     }
   }
 
-  async function toggleRoom(roomId: string, isActive: boolean, source: 'chatwork' | 'teams') {
+  async function toggleRoom(roomId: string, isActive: boolean, source: 'chatwork' | 'teams' | 'lark') {
     try {
       const res = await fetch('/api/rooms', {
         method: 'PATCH',
@@ -181,8 +203,12 @@ export default function SettingsPage() {
           setChatworkRooms(chatworkRooms.map(room =>
             room.room_id === roomId ? { ...room, is_active: isActive } : room
           ))
-        } else {
+        } else if (source === 'teams') {
           setTeamsRooms(teamsRooms.map(room =>
+            room.room_id === roomId ? { ...room, is_active: isActive } : room
+          ))
+        } else {
+          setLarkRooms(larkRooms.map(room =>
             room.room_id === roomId ? { ...room, is_active: isActive } : room
           ))
         }
@@ -231,6 +257,95 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage('チャネルを削除しました')
         setTeamsRooms(teamsRooms.filter(room => room.room_id !== roomId))
+      } else {
+        setMessage('削除に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    }
+  }
+
+  async function saveLarkSettings() {
+    if (!larkAppId && !settings.has_lark_settings) {
+      setMessage('App IDを入力してください')
+      return
+    }
+    if (!larkVerificationToken && !settings.has_lark_settings) {
+      setMessage('Verification Tokenを入力してください')
+      return
+    }
+
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          larkAppId: larkAppId || undefined,
+          larkAppSecret: larkAppSecret || undefined,
+          larkVerificationToken: larkVerificationToken || undefined,
+          larkEncryptKey: larkEncryptKey || undefined,
+        }),
+      })
+
+      if (res.ok) {
+        setMessage('Lark設定を保存しました')
+        setLarkAppId('')
+        setLarkAppSecret('')
+        setLarkVerificationToken('')
+        setLarkEncryptKey('')
+        fetchData()
+      } else {
+        setMessage('保存に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function addLarkChat() {
+    if (!newLarkChatId || !newLarkChatName) {
+      setMessage('チャットIDと名前を入力してください')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: newLarkChatId,
+          roomName: newLarkChatName,
+          source: 'lark',
+        }),
+      })
+
+      if (res.ok) {
+        setMessage('チャットを追加しました')
+        setNewLarkChatId('')
+        setNewLarkChatName('')
+        fetchData()
+      } else {
+        setMessage('チャットの追加に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    }
+  }
+
+  async function deleteLarkChat(roomId: string) {
+    try {
+      const res = await fetch(`/api/rooms?roomId=${encodeURIComponent(roomId)}&source=lark`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setMessage('チャットを削除しました')
+        setLarkRooms(larkRooms.filter(room => room.room_id !== roomId))
       } else {
         setMessage('削除に失敗しました')
       }
@@ -314,6 +429,10 @@ export default function SettingsPage() {
     ? `${window.location.origin}/api/webhook/teams`
     : ''
 
+  const larkWebhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/webhook/lark`
+    : ''
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -384,6 +503,19 @@ export default function SettingsPage() {
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-purple-500"></span>
               Microsoft Teams
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('lark')}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'lark'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              Lark
             </span>
           </button>
         </nav>
@@ -807,6 +939,228 @@ export default function SettingsPage() {
                     </span>
                     <button
                       onClick={() => deleteTeamsChannel(room.room_id)}
+                      className="px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                    >
+                      削除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Lark タブ */}
+      {activeTab === 'lark' && (
+        <div className="space-y-6">
+          {/* Lark API設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Lark API設定</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Lark Open Platformでアプリを作成し、Event Subscription設定でイベントを購読してください。
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  App ID
+                </label>
+                {settings.has_lark_settings && settings.lark_app_id && (
+                  <p className="text-sm text-blue-600 mb-2">
+                    現在のApp ID: {settings.lark_app_id}
+                  </p>
+                )}
+                <input
+                  type="text"
+                  value={larkAppId}
+                  onChange={e => setLarkAppId(e.target.value)}
+                  placeholder={settings.has_lark_settings ? '新しいApp IDを入力（変更する場合）' : 'cli_xxxxxxxxxx'}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  App Secret
+                </label>
+                <div className="relative">
+                  <input
+                    type={showLarkSecret ? 'text' : 'password'}
+                    value={larkAppSecret}
+                    onChange={e => setLarkAppSecret(e.target.value)}
+                    placeholder="App Secretを入力"
+                    className="w-full px-4 py-2 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={() => setShowLarkSecret(true)}
+                    onMouseUp={() => setShowLarkSecret(false)}
+                    onMouseLeave={() => setShowLarkSecret(false)}
+                    onTouchStart={() => setShowLarkSecret(true)}
+                    onTouchEnd={() => setShowLarkSecret(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    title="押している間表示"
+                  >
+                    {showLarkSecret ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                        <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Verification Token
+                </label>
+                {settings.has_lark_settings && settings.lark_verification_token && (
+                  <p className="text-sm text-blue-600 mb-2">
+                    現在のトークン: {settings.lark_verification_token}
+                  </p>
+                )}
+                <input
+                  type="password"
+                  value={larkVerificationToken}
+                  onChange={e => setLarkVerificationToken(e.target.value)}
+                  placeholder={settings.has_lark_settings ? '新しいトークンを入力（変更する場合）' : 'Verification Tokenを入力'}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Lark Developer Console → Event Subscriptions で確認できます
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Encrypt Key（オプション）
+                </label>
+                <input
+                  type="password"
+                  value={larkEncryptKey}
+                  onChange={e => setLarkEncryptKey(e.target.value)}
+                  placeholder="暗号化を使用する場合のみ入力"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Event Subscriptionで暗号化を有効にした場合に必要です
+                </p>
+              </div>
+
+              <button
+                onClick={saveLarkSettings}
+                disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? '保存中...' : '設定を保存'}
+              </button>
+            </div>
+          </div>
+
+          {/* Webhook URL */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Webhook URL</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              このURLをLark Open Platformの Event Subscription → Request URL に設定してください。
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={larkWebhookUrl}
+                readOnly
+                className="flex-1 px-4 py-2 border rounded-lg bg-gray-50 text-sm"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(larkWebhookUrl)
+                  setMessage('URLをコピーしました')
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                コピー
+              </button>
+            </div>
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+              <h3 className="text-sm font-medium text-blue-800 mb-2">設定手順</h3>
+              <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
+                <li>Lark Developer Console でアプリを作成</li>
+                <li>Event Subscriptions を有効化</li>
+                <li>上記URLを Request URL に設定</li>
+                <li>「im.message.receive_v1」イベントを購読</li>
+                <li>アプリに必要な権限を追加してパブリッシュ</li>
+              </ol>
+            </div>
+          </div>
+
+          {/* チャット手動登録 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">チャットを登録</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              監視したいLarkグループチャットのIDと名前を入力して登録してください。
+            </p>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newLarkChatId}
+                onChange={e => setNewLarkChatId(e.target.value)}
+                placeholder="チャットID（oc_xxxxxxxxxx）"
+                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <input
+                type="text"
+                value={newLarkChatName}
+                onChange={e => setNewLarkChatName(e.target.value)}
+                placeholder="チャット名"
+                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <button
+                onClick={addLarkChat}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                追加
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 mb-4">
+              チャットIDはWebhookの初回受信時にログで確認できます。
+            </p>
+          </div>
+
+          {/* 監視チャット設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">監視するチャット</h2>
+
+            {larkRooms.length === 0 ? (
+              <p className="text-gray-500">
+                チャットがありません。上のフォームからチャットを追加してください。
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {larkRooms.map(room => (
+                  <div
+                    key={room.room_id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={room.is_active}
+                      onChange={e => toggleRoom(room.room_id, e.target.checked, 'lark')}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="flex-1 text-gray-900">{room.room_name}</span>
+                    <span className="text-xs text-gray-400 truncate max-w-xs" title={room.room_id}>
+                      {room.room_id.slice(0, 20)}...
+                    </span>
+                    <button
+                      onClick={() => deleteLarkChat(room.room_id)}
                       className="px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
                     >
                       削除
