@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getSettings, getActiveRoomsBySource, createTask, getTaskByMessageId } from '@/lib/db'
-import { verifyTeamsSignature, parseTeamsPayload, createEmptyResponse, type TeamsWebhookPayload } from '@/lib/teams'
+import { verifyTeamsSignature, parseTeamsPayload, type TeamsWebhookPayload } from '@/lib/teams'
 import { analyzeMessage } from '@/lib/extractor'
+
+// Teams Botの返信を無効化するための空レスポンス
+function emptyResponse() {
+  return new NextResponse(null, { status: 200 })
+}
 
 export async function POST(request: Request) {
   try {
@@ -30,7 +35,7 @@ export async function POST(request: Request) {
     // メッセージタイプの確認
     if (payload.type !== 'message') {
       console.log('[Teams Webhook] Not a message, skip')
-      return NextResponse.json(createEmptyResponse())
+      return emptyResponse()
     }
 
     // 正規化されたメッセージを取得
@@ -47,7 +52,7 @@ export async function POST(request: Request) {
 
     if (!isActiveRoom) {
       console.log('[Teams Webhook] Channel not monitored')
-      return NextResponse.json(createEmptyResponse())
+      return emptyResponse()
     }
 
     // タスク分析
@@ -57,14 +62,14 @@ export async function POST(request: Request) {
 
     if (!analysis.isTask) {
       console.log('[Teams Webhook] Not a task')
-      return NextResponse.json(createEmptyResponse())
+      return emptyResponse()
     }
 
     // 重複チェック
     const existingTask = await getTaskByMessageId(message.activityId, 'teams')
     if (existingTask) {
       console.log('[Teams Webhook] Duplicate message, skipping:', message.activityId)
-      return NextResponse.json(createEmptyResponse())
+      return emptyResponse()
     }
 
     // タスク作成
@@ -82,7 +87,7 @@ export async function POST(request: Request) {
     console.log('[Teams Webhook] Task created:', task.id)
 
     // レスポンス（5秒以内に返す必要がある）
-    return NextResponse.json(createEmptyResponse())
+    return emptyResponse()
   } catch (error) {
     console.error('[Teams Webhook] Error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
