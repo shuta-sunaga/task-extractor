@@ -217,6 +217,13 @@ export async function getTasks() {
   return result.rows
 }
 
+export async function getTaskByMessageId(messageId: string, source: Source) {
+  const result = await sql`
+    SELECT * FROM tasks WHERE message_id = ${messageId} AND source = ${source} LIMIT 1
+  `
+  return result.rows[0] || null
+}
+
 export async function createTask(task: {
   roomId: string
   messageId: string

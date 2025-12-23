@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSettings, getActiveRoomsBySource, createTask } from '@/lib/db'
+import { getSettings, getActiveRoomsBySource, createTask, getTaskByMessageId } from '@/lib/db'
 import { verifyTeamsSignature, parseTeamsPayload, createEmptyResponse, type TeamsWebhookPayload } from '@/lib/teams'
 import { analyzeMessage } from '@/lib/extractor'
 
@@ -57,6 +57,13 @@ export async function POST(request: Request) {
 
     if (!analysis.isTask) {
       console.log('[Teams Webhook] Not a task')
+      return NextResponse.json(createEmptyResponse())
+    }
+
+    // 重複チェック
+    const existingTask = await getTaskByMessageId(message.activityId, 'teams')
+    if (existingTask) {
+      console.log('[Teams Webhook] Duplicate message, skipping:', message.activityId)
       return NextResponse.json(createEmptyResponse())
     }
 

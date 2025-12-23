@@ -100,14 +100,31 @@ export function verifyTeamsSignature(
 }
 
 /**
- * @mention タグを除去してメッセージ本文を取得
+ * HTMLタグと@mentionを除去してプレーンテキストを取得
  */
-export function stripMention(text: string): string {
+export function stripHtmlAndMention(text: string): string {
+  let cleaned = text
   // <at>BotName</at> パターンを除去
-  let cleaned = text.replace(/<at>.*?<\/at>/gi, '')
+  cleaned = cleaned.replace(/<at>.*?<\/at>/gi, '')
+  // 全てのHTMLタグを除去
+  cleaned = cleaned.replace(/<[^>]*>/g, '')
+  // HTML エンティティをデコード
+  cleaned = cleaned.replace(/&nbsp;/g, ' ')
+  cleaned = cleaned.replace(/&amp;/g, '&')
+  cleaned = cleaned.replace(/&lt;/g, '<')
+  cleaned = cleaned.replace(/&gt;/g, '>')
+  cleaned = cleaned.replace(/&quot;/g, '"')
   // 前後の空白・改行を除去
   cleaned = cleaned.trim()
   return cleaned
+}
+
+/**
+ * @mention タグを除去してメッセージ本文を取得
+ * @deprecated Use stripHtmlAndMention instead
+ */
+export function stripMention(text: string): string {
+  return stripHtmlAndMention(text)
 }
 
 /**
