@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import Logo from './components/Logo'
 
 export const metadata: Metadata = {
   title: 'たすきゃっちゃー',
@@ -24,14 +23,12 @@ export default function RootLayout({
         <header className="bg-gradient-to-r from-teal-500 to-cyan-500 shadow-md">
           <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex justify-between items-center">
-              <a href="/" className="flex items-center gap-3 group">
-                <Logo className="w-10 h-10 drop-shadow group-hover:scale-105 transition-transform" />
-                <span
-                  className="text-2xl font-bold text-white drop-shadow"
-                  style={{ fontFamily: '"Zen Maru Gothic", sans-serif' }}
-                >
-                  たすきゃっちゃー
-                </span>
+              <a
+                href="/"
+                className="text-2xl font-bold text-white drop-shadow hover:opacity-90 transition-opacity"
+                style={{ fontFamily: '"Zen Maru Gothic", sans-serif' }}
+              >
+                たすきゃっちゃー
               </a>
               <nav className="flex gap-4">
                 <a
