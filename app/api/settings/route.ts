@@ -17,6 +17,8 @@ export async function GET() {
         notify_on_create: notificationSettings.notify_on_create,
         notify_on_complete: notificationSettings.notify_on_complete,
         notify_on_delete: notificationSettings.notify_on_delete,
+        resend_api_key: '',
+        has_resend_key: false,
       })
     }
 
@@ -35,6 +37,10 @@ export async function GET() {
       notify_on_create: notificationSettings.notify_on_create,
       notify_on_complete: notificationSettings.notify_on_complete,
       notify_on_delete: notificationSettings.notify_on_delete,
+      resend_api_key: notificationSettings.resend_api_key
+        ? '****' + notificationSettings.resend_api_key.slice(-4)
+        : '',
+      has_resend_key: Boolean(notificationSettings.resend_api_key),
     })
   } catch (error) {
     console.error('Get settings error:', error)
@@ -56,6 +62,7 @@ export async function POST(request: Request) {
       notifyOnCreate,
       notifyOnComplete,
       notifyOnDelete,
+      resendApiKey,
     } = body
 
     // Chatwork設定の保存
@@ -73,12 +80,13 @@ export async function POST(request: Request) {
     }
 
     // 通知設定の保存
-    if (notificationEmails !== undefined) {
+    if (notificationEmails !== undefined || resendApiKey !== undefined) {
       await saveNotificationSettings({
-        notification_emails: notificationEmails,
+        notification_emails: notificationEmails ?? [],
         notify_on_create: notifyOnCreate ?? true,
         notify_on_complete: notifyOnComplete ?? true,
         notify_on_delete: notifyOnDelete ?? false,
+        resend_api_key: resendApiKey,
       })
     }
 

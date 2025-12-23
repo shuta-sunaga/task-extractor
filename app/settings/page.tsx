@@ -20,6 +20,8 @@ type Settings = {
   notify_on_create: boolean
   notify_on_complete: boolean
   notify_on_delete: boolean
+  resend_api_key: string
+  has_resend_key: boolean
 }
 
 type Tab = 'general' | 'chatwork' | 'teams'
@@ -36,6 +38,8 @@ export default function SettingsPage() {
     notify_on_create: true,
     notify_on_complete: true,
     notify_on_delete: false,
+    resend_api_key: '',
+    has_resend_key: false,
   })
   const [chatworkRooms, setChatworkRooms] = useState<Room[]>([])
   const [teamsRooms, setTeamsRooms] = useState<Room[]>([])
@@ -58,6 +62,7 @@ export default function SettingsPage() {
   const [notifyOnCreate, setNotifyOnCreate] = useState(true)
   const [notifyOnComplete, setNotifyOnComplete] = useState(true)
   const [notifyOnDelete, setNotifyOnDelete] = useState(false)
+  const [resendApiKey, setResendApiKey] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -269,11 +274,13 @@ export default function SettingsPage() {
           notifyOnCreate,
           notifyOnComplete,
           notifyOnDelete,
+          resendApiKey: resendApiKey || undefined,
         }),
       })
 
       if (res.ok) {
         setMessage('通知設定を保存しました')
+        setResendApiKey('')
         fetchData()
       } else {
         setMessage('保存に失敗しました')
@@ -494,26 +501,44 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Resend設定案内 */}
+          {/* Resend API設定 */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4">メール送信サービス設定</h2>
             <p className="text-sm text-gray-600 mb-4">
-              メール通知にはResendを使用しています。環境変数に以下を設定してください：
-            </p>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <code className="text-sm text-gray-800">RESEND_API_KEY=re_xxxxxxxxxx</code>
-            </div>
-            <p className="text-sm text-gray-500 mt-2">
+              メール通知にはResendを使用しています。
               <a
                 href="https://resend.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-teal-600 hover:underline"
+                className="text-teal-600 hover:underline ml-1"
               >
                 Resend
               </a>
-              で無料アカウントを作成し、APIキーを取得してください。
+              で無料アカウントを作成し、APIキーを取得してください（無料枠: 3000通/月）。
             </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Resend APIキー
+                </label>
+                {settings.has_resend_key && (
+                  <p className="text-sm text-teal-600 mb-2">
+                    現在のキー: {settings.resend_api_key}
+                  </p>
+                )}
+                <input
+                  type="password"
+                  value={resendApiKey}
+                  onChange={e => setResendApiKey(e.target.value)}
+                  placeholder={settings.has_resend_key ? '新しいキーを入力（変更する場合）' : 're_xxxxxxxxxx'}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Resendダッシュボード → API Keys から取得できます
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}

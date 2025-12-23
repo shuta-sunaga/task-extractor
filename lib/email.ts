@@ -1,17 +1,16 @@
 import { Resend } from 'resend'
 import { getNotificationSettings } from './db'
 
-// 遅延初期化（APIキーがない場合のビルドエラーを回避）
-let resend: Resend | null = null
+// APIキーごとにクライアントをキャッシュ
+const resendClients = new Map<string, Resend>()
 
-function getResendClient(): Resend | null {
-  if (!process.env.RESEND_API_KEY) {
-    return null
+function getResendClient(apiKey: string): Resend {
+  let client = resendClients.get(apiKey)
+  if (!client) {
+    client = new Resend(apiKey)
+    resendClients.set(apiKey, client)
   }
-  if (!resend) {
-    resend = new Resend(process.env.RESEND_API_KEY)
-  }
-  return resend
+  return client
 }
 
 export type TaskInfo = {
@@ -107,15 +106,14 @@ export async function sendTaskNotification(
   dashboardUrl: string = 'https://task-extractor-ten.vercel.app/'
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Resendクライアントを取得
-    const client = getResendClient()
-    if (!client) {
-      console.log('[Email] RESEND_API_KEY not configured, skipping notification')
-      return { success: true }
-    }
-
     // 通知設定を取得
     const settings = await getNotificationSettings()
+
+    // APIキーがない場合はスキップ
+    if (!settings.resend_api_key) {
+      console.log('[Email] Resend API key not configured, skipping notification')
+      return { success: true }
+    }
 
     // 通知が無効の場合はスキップ
     if (type === 'create' && !settings.notify_on_create) {
@@ -136,6 +134,9 @@ export async function sendTaskNotification(
       console.log('[Email] No notification emails configured')
       return { success: true }
     }
+
+    // Resendクライアントを取得
+    const client = getResendClient(settings.resend_api_key)
 
     const subject = `[たすきゃっちゃー] ${NOTIFICATION_SUBJECTS[type]}`
     const html = generateEmailHtml(task, type, dashboardUrl)

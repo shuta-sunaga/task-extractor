@@ -37,6 +37,10 @@ export async function initDatabase() {
     ALTER TABLE settings
     ADD COLUMN IF NOT EXISTS notify_on_delete BOOLEAN DEFAULT false
   `
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS resend_api_key TEXT
+  `
 
   // Rooms テーブル
   await sql`
@@ -156,6 +160,7 @@ export type NotificationSettings = {
   notify_on_create: boolean
   notify_on_complete: boolean
   notify_on_delete: boolean
+  resend_api_key: string
 }
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {
@@ -166,6 +171,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
       notify_on_create: true,
       notify_on_complete: true,
       notify_on_delete: false,
+      resend_api_key: '',
     }
   }
 
@@ -178,26 +184,39 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
     notify_on_create: settings.notify_on_create ?? true,
     notify_on_complete: settings.notify_on_complete ?? true,
     notify_on_delete: settings.notify_on_delete ?? false,
+    resend_api_key: settings.resend_api_key || '',
   }
 }
 
-export async function saveNotificationSettings(notificationSettings: NotificationSettings) {
+export async function saveNotificationSettings(notificationSettings: Omit<NotificationSettings, 'resend_api_key'> & { resend_api_key?: string }) {
   const existing = await getSettings()
   const emailsStr = notificationSettings.notification_emails.join(',')
 
   if (existing) {
-    await sql`
-      UPDATE settings
-      SET notification_emails = ${emailsStr},
-          notify_on_create = ${notificationSettings.notify_on_create},
-          notify_on_complete = ${notificationSettings.notify_on_complete},
-          notify_on_delete = ${notificationSettings.notify_on_delete}
-      WHERE id = ${existing.id}
-    `
+    if (notificationSettings.resend_api_key !== undefined) {
+      await sql`
+        UPDATE settings
+        SET notification_emails = ${emailsStr},
+            notify_on_create = ${notificationSettings.notify_on_create},
+            notify_on_complete = ${notificationSettings.notify_on_complete},
+            notify_on_delete = ${notificationSettings.notify_on_delete},
+            resend_api_key = ${notificationSettings.resend_api_key}
+        WHERE id = ${existing.id}
+      `
+    } else {
+      await sql`
+        UPDATE settings
+        SET notification_emails = ${emailsStr},
+            notify_on_create = ${notificationSettings.notify_on_create},
+            notify_on_complete = ${notificationSettings.notify_on_complete},
+            notify_on_delete = ${notificationSettings.notify_on_delete}
+        WHERE id = ${existing.id}
+      `
+    }
   } else {
     await sql`
-      INSERT INTO settings (notification_emails, notify_on_create, notify_on_complete, notify_on_delete)
-      VALUES (${emailsStr}, ${notificationSettings.notify_on_create}, ${notificationSettings.notify_on_complete}, ${notificationSettings.notify_on_delete})
+      INSERT INTO settings (notification_emails, notify_on_create, notify_on_complete, notify_on_delete, resend_api_key)
+      VALUES (${emailsStr}, ${notificationSettings.notify_on_create}, ${notificationSettings.notify_on_complete}, ${notificationSettings.notify_on_delete}, ${notificationSettings.resend_api_key || null})
     `
   }
 }
