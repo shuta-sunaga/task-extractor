@@ -3,7 +3,12 @@ import { getSettings, getActiveRoomsBySource, createTask, getTaskByMessageId } f
 import { verifyTeamsSignature, parseTeamsPayload, type TeamsWebhookPayload } from '@/lib/teams'
 import { analyzeMessage } from '@/lib/extractor'
 
-// Teams Botの返信を無効化するための空レスポンス
+// シンプルな応答（Botの返信として表示される）
+function simpleResponse(text: string = '✅') {
+  return NextResponse.json({ type: 'message', text })
+}
+
+// 何も返さない（タスク対象外の場合）
 function emptyResponse() {
   return new NextResponse(null, { status: 200 })
 }
@@ -87,7 +92,7 @@ export async function POST(request: Request) {
     console.log('[Teams Webhook] Task created:', task.id)
 
     // レスポンス（5秒以内に返す必要がある）
-    return emptyResponse()
+    return simpleResponse('タスクの登録が完了しました。\nhttps://task-extractor-ten.vercel.app/')
   } catch (error) {
     console.error('[Teams Webhook] Error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
