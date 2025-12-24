@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
-import { getRoomsByWorkspace, createSlackRoom, setRoomActive, deleteRoom } from '@/lib/db'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { getRoomsByWorkspace, createSlackRoom, setRoomActive, deleteRoom, getSlackWorkspace, getRoomByIdAndSource } from '@/lib/db'
 
 export async function GET(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId
+
     const { searchParams } = new URL(request.url)
     const workspaceId = searchParams.get('workspaceId')
 
@@ -10,6 +15,15 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { error: 'Missing workspaceId' },
         { status: 400 }
+      )
+    }
+
+    // ワークスペースが自社のものか確認
+    const workspace = await getSlackWorkspace(workspaceId)
+    if (!workspace || (companyId && workspace.company_id !== companyId)) {
+      return NextResponse.json(
+        { error: 'Workspace not found' },
+        { status: 404 }
       )
     }
 
@@ -26,6 +40,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId ?? undefined
+
     const body = await request.json()
     const { channelId, channelName, workspaceId } = body
 
@@ -36,7 +53,16 @@ export async function POST(request: Request) {
       )
     }
 
-    const channel = await createSlackRoom(channelId, channelName, workspaceId)
+    // ワークスペースが自社のものか確認
+    const workspace = await getSlackWorkspace(workspaceId)
+    if (!workspace || (companyId && workspace.company_id !== companyId)) {
+      return NextResponse.json(
+        { error: 'Workspace not found' },
+        { status: 404 }
+      )
+    }
+
+    const channel = await createSlackRoom(channelId, channelName, workspaceId, companyId)
     return NextResponse.json(channel)
   } catch (error) {
     console.error('Create Slack channel error:', error)
@@ -49,6 +75,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId ?? undefined
+
     const body = await request.json()
     const { channelId, isActive } = body
 
@@ -56,6 +85,15 @@ export async function PATCH(request: Request) {
       return NextResponse.json(
         { error: 'Missing channelId' },
         { status: 400 }
+      )
+    }
+
+    // チャンネルが自社のものか確認
+    const room = await getRoomByIdAndSource(channelId, 'slack')
+    if (!room || (companyId && room.company_id !== companyId)) {
+      return NextResponse.json(
+        { error: 'Channel not found' },
+        { status: 404 }
       )
     }
 
@@ -72,6 +110,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId ?? undefined
+
     const { searchParams } = new URL(request.url)
     const channelId = searchParams.get('channelId')
 
@@ -79,6 +120,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json(
         { error: 'Missing channelId' },
         { status: 400 }
+      )
+    }
+
+    // チャンネルが自社のものか確認
+    const room = await getRoomByIdAndSource(channelId, 'slack')
+    if (!room || (companyId && room.company_id !== companyId)) {
+      return NextResponse.json(
+        { error: 'Channel not found' },
+        { status: 404 }
       )
     }
 

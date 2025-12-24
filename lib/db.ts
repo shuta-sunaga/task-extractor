@@ -551,6 +551,13 @@ export async function deleteRoom(roomId: string, source: Source) {
   `
 }
 
+export async function getRoomByIdAndSource(roomId: string, source: Source): Promise<{ id: number; room_id: string; room_name: string; is_active: boolean; workspace_id?: string; company_id?: number } | null> {
+  const result = await sql`
+    SELECT * FROM rooms WHERE room_id = ${roomId} AND source = ${source} LIMIT 1
+  `
+  return result.rows[0] as { id: number; room_id: string; room_name: string; is_active: boolean; workspace_id?: string; company_id?: number } | null
+}
+
 // Tasks
 export async function getTasks(companyId?: number) {
   if (companyId) {
@@ -644,7 +651,13 @@ export async function deleteTask(id: number) {
 }
 
 // Slack Workspaces
-export async function getSlackWorkspaces(): Promise<SlackWorkspace[]> {
+export async function getSlackWorkspaces(companyId?: number): Promise<SlackWorkspace[]> {
+  if (companyId !== undefined) {
+    const result = await sql`
+      SELECT * FROM slack_workspaces WHERE company_id = ${companyId} ORDER BY workspace_name
+    `
+    return result.rows as SlackWorkspace[]
+  }
   const result = await sql`
     SELECT * FROM slack_workspaces ORDER BY workspace_name
   `
@@ -671,15 +684,17 @@ export async function createSlackWorkspace(workspace: {
   botToken: string
   signingSecret: string
   botUserId?: string
+  companyId?: number
 }): Promise<SlackWorkspace> {
   const result = await sql`
-    INSERT INTO slack_workspaces (workspace_id, workspace_name, bot_token, signing_secret, bot_user_id)
-    VALUES (${workspace.workspaceId}, ${workspace.workspaceName}, ${workspace.botToken}, ${workspace.signingSecret}, ${workspace.botUserId || null})
+    INSERT INTO slack_workspaces (workspace_id, workspace_name, bot_token, signing_secret, bot_user_id, company_id)
+    VALUES (${workspace.workspaceId}, ${workspace.workspaceName}, ${workspace.botToken}, ${workspace.signingSecret}, ${workspace.botUserId || null}, ${workspace.companyId ?? null})
     ON CONFLICT (workspace_id) DO UPDATE SET
       workspace_name = ${workspace.workspaceName},
       bot_token = ${workspace.botToken},
       signing_secret = ${workspace.signingSecret},
-      bot_user_id = COALESCE(${workspace.botUserId || null}, slack_workspaces.bot_user_id)
+      bot_user_id = COALESCE(${workspace.botUserId || null}, slack_workspaces.bot_user_id),
+      company_id = COALESCE(${workspace.companyId ?? null}, slack_workspaces.company_id)
     RETURNING *
   `
   return result.rows[0] as SlackWorkspace

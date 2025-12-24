@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import {
   getSlackWorkspaces,
+  getSlackWorkspace,
   createSlackWorkspace,
   deleteSlackWorkspace,
   updateSlackWorkspace,
@@ -10,7 +13,9 @@ import { getSlackBotInfo } from '@/lib/slack'
 
 export async function GET() {
   try {
-    const workspaces = await getSlackWorkspaces()
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId ?? undefined
+    const workspaces = await getSlackWorkspaces(companyId)
 
     // 各ワークスペースのチャンネル数を取得
     const workspacesWithChannels = await Promise.all(
@@ -39,6 +44,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId ?? undefined
+
     const body = await request.json()
     const { workspaceId, workspaceName, botToken, signingSecret } = body
 
@@ -67,6 +75,7 @@ export async function POST(request: Request) {
       botToken,
       signingSecret,
       botUserId: botInfo.userId,
+      companyId,
     })
 
     return NextResponse.json({
@@ -85,6 +94,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId
+
     const body = await request.json()
     const { workspaceId, isActive } = body
 
@@ -92,6 +104,15 @@ export async function PATCH(request: Request) {
       return NextResponse.json(
         { error: 'Missing workspaceId' },
         { status: 400 }
+      )
+    }
+
+    // 企業IDが一致するか確認
+    const workspace = await getSlackWorkspace(workspaceId)
+    if (!workspace || (companyId && workspace.company_id !== companyId)) {
+      return NextResponse.json(
+        { error: 'Workspace not found' },
+        { status: 404 }
       )
     }
 
@@ -109,6 +130,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId
+
     const { searchParams } = new URL(request.url)
     const workspaceId = searchParams.get('workspaceId')
 
@@ -116,6 +140,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json(
         { error: 'Missing workspaceId' },
         { status: 400 }
+      )
+    }
+
+    // 企業IDが一致するか確認
+    const workspace = await getSlackWorkspace(workspaceId)
+    if (!workspace || (companyId && workspace.company_id !== companyId)) {
+      return NextResponse.json(
+        { error: 'Workspace not found' },
+        { status: 404 }
       )
     }
 
