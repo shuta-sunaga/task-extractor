@@ -146,3 +146,114 @@ export function getChannelType(channelType?: string): string {
       return 'チャンネル'
   }
 }
+
+/**
+ * member_joined_channel イベントかどうかを判定
+ */
+export function isMemberJoinedChannelEvent(payload: SlackEventPayload): boolean {
+  return (
+    payload.type === 'event_callback' &&
+    payload.event?.type === 'member_joined_channel'
+  )
+}
+
+/**
+ * member_joined_channel イベントからデータを抽出
+ */
+export function parseMemberJoinedEvent(payload: SlackEventPayload): {
+  userId: string
+  channelId: string
+  channelType: string
+  teamId: string
+} | null {
+  const event = payload.event
+  if (!event || event.type !== 'member_joined_channel' || !event.user || !event.channel) {
+    return null
+  }
+
+  return {
+    userId: event.user,
+    channelId: event.channel,
+    channelType: event.channel_type || 'channel',
+    teamId: payload.team_id || '',
+  }
+}
+
+/**
+ * Slack auth.test APIでボット情報を取得
+ */
+export async function getSlackBotInfo(botToken: string): Promise<{
+  ok: boolean
+  userId?: string
+  teamId?: string
+  error?: string
+}> {
+  try {
+    const res = await fetch('https://slack.com/api/auth.test', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${botToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+
+    const data = await res.json()
+
+    if (data.ok) {
+      return {
+        ok: true,
+        userId: data.user_id,
+        teamId: data.team_id,
+      }
+    } else {
+      return {
+        ok: false,
+        error: data.error || 'Unknown error',
+      }
+    }
+  } catch (error) {
+    console.error('[Slack] auth.test API error:', error)
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Slack conversations.info APIでチャンネル情報を取得
+ */
+export async function getSlackChannelInfo(botToken: string, channelId: string): Promise<{
+  ok: boolean
+  channelName?: string
+  error?: string
+}> {
+  try {
+    const res = await fetch(`https://slack.com/api/conversations.info?channel=${channelId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${botToken}`,
+      },
+    })
+
+    const data = await res.json()
+
+    if (data.ok && data.channel) {
+      return {
+        ok: true,
+        channelName: data.channel.name || channelId,
+      }
+    } else {
+      return {
+        ok: false,
+        error: data.error || 'Unknown error',
+      }
+    }
+  } catch (error) {
+    console.error('[Slack] conversations.info API error:', error)
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}

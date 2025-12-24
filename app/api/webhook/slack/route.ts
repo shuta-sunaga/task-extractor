@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
-import { getActiveSlackWorkspaces, getActiveRoomsByWorkspace, createTask, getTaskByMessageId } from '@/lib/db'
+import { getActiveSlackWorkspaces, getActiveRoomsByWorkspace, createTask, getTaskByMessageId, createSlackRoom } from '@/lib/db'
 import {
   isUrlVerification,
   createChallengeResponse,
   verifySlackSignature,
   isMessageEvent,
   parseSlackMessage,
+  isMemberJoinedChannelEvent,
+  parseMemberJoinedEvent,
+  getSlackChannelInfo,
   type SlackEventPayload,
 } from '@/lib/slack'
 import { analyzeMessage } from '@/lib/extractor'
@@ -47,6 +50,28 @@ export async function POST(request: Request) {
     if (!verifySlackSignature(workspace.signing_secret, signature, timestamp, rawBody)) {
       console.error('[Slack Webhook] Invalid signature for workspace:', teamId)
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+
+    // ボットがチャンネルに参加した場合、自動的に監視対象として登録
+    if (isMemberJoinedChannelEvent(payload)) {
+      const joinEvent = parseMemberJoinedEvent(payload)
+      if (joinEvent && workspace.bot_user_id && joinEvent.userId === workspace.bot_user_id) {
+        console.log('[Slack Webhook] Bot joined channel:', joinEvent.channelId)
+
+        // チャンネル名を取得
+        const channelInfo = await getSlackChannelInfo(workspace.bot_token, joinEvent.channelId)
+        const channelName = channelInfo.ok ? channelInfo.channelName! : joinEvent.channelId
+
+        // チャンネルを自動登録
+        await createSlackRoom(joinEvent.channelId, channelName, teamId)
+        console.log('[Slack Webhook] Auto-registered channel:', channelName, '(', joinEvent.channelId, ')')
+
+        return NextResponse.json({ ok: true })
+      }
+
+      // ボット以外のメンバー参加はスキップ
+      console.log('[Slack Webhook] Other member joined channel, skip')
+      return NextResponse.json({ ok: true })
     }
 
     // メッセージイベント以外はスキップ

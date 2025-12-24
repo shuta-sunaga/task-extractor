@@ -7,7 +7,9 @@
       "WebFetch(domain:open.larksuite.com)",
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:open.larkoffice.com)"
+      "WebFetch(domain:open.larkoffice.com)",
+      "WebFetch(domain:api.slack.com)",
+      "WebFetch(domain:docs.slack.dev)"
     ]
   }
 }

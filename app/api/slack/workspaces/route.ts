@@ -6,6 +6,7 @@ import {
   updateSlackWorkspace,
   getRoomsByWorkspace,
 } from '@/lib/db'
+import { getSlackBotInfo } from '@/lib/slack'
 
 export async function GET() {
   try {
@@ -48,11 +49,24 @@ export async function POST(request: Request) {
       )
     }
 
+    // auth.test APIでボット情報を取得
+    const botInfo = await getSlackBotInfo(botToken)
+    if (!botInfo.ok) {
+      console.error('Failed to verify bot token:', botInfo.error)
+      return NextResponse.json(
+        { error: `Invalid bot token: ${botInfo.error}` },
+        { status: 400 }
+      )
+    }
+
+    console.log('[Slack] Bot info:', { userId: botInfo.userId, teamId: botInfo.teamId })
+
     const workspace = await createSlackWorkspace({
       workspaceId,
       workspaceName,
       botToken,
       signingSecret,
+      botUserId: botInfo.userId,
     })
 
     return NextResponse.json({
