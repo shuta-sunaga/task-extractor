@@ -51,6 +51,11 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [accessDenied, setAccessDenied] = useState(false)
+
+  // 各タブのデータ読み込み状態
+  const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set(['general']))
+  const [tabLoading, setTabLoading] = useState<Tab | null>(null)
+
   const [settings, setSettings] = useState<Settings>({
     chatwork_api_token: '',
     webhook_token: '',
@@ -143,17 +148,14 @@ export default function SettingsPage() {
       return
     }
 
-    fetchData()
+    fetchInitialData()
   }, [session, sessionStatus, slug, router])
 
-  async function fetchData() {
+  // 初回読み込み: 設定 + 企業情報のみ
+  async function fetchInitialData() {
     try {
-      const [settingsRes, chatworkRoomsRes, teamsRoomsRes, larkRoomsRes, slackWorkspacesRes, companyRes] = await Promise.all([
+      const [settingsRes, companyRes] = await Promise.all([
         fetch('/api/settings'),
-        fetch('/api/rooms?source=chatwork'),
-        fetch('/api/rooms?source=teams'),
-        fetch('/api/rooms?source=lark'),
-        fetch('/api/slack/workspaces'),
         fetch('/api/companies/me'),
       ])
 
@@ -171,30 +173,66 @@ export default function SettingsPage() {
         setNotifyOnComplete(data.notify_on_complete ?? true)
         setNotifyOnDelete(data.notify_on_delete ?? false)
       }
-
-      if (chatworkRoomsRes.ok) {
-        const data = await chatworkRoomsRes.json()
-        setChatworkRooms(Array.isArray(data) ? data : [])
-      }
-
-      if (teamsRoomsRes.ok) {
-        const data = await teamsRoomsRes.json()
-        setTeamsRooms(Array.isArray(data) ? data : [])
-      }
-
-      if (larkRoomsRes.ok) {
-        const data = await larkRoomsRes.json()
-        setLarkRooms(Array.isArray(data) ? data : [])
-      }
-
-      if (slackWorkspacesRes.ok) {
-        const data = await slackWorkspacesRes.json()
-        setSlackWorkspaces(Array.isArray(data) ? data : [])
-      }
     } catch (error) {
-      console.error('Failed to fetch data:', error)
+      console.error('Failed to fetch initial data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // タブ別データ取得
+  async function fetchTabData(tab: Tab) {
+    if (loadedTabs.has(tab)) return
+
+    setTabLoading(tab)
+    try {
+      switch (tab) {
+        case 'chatwork': {
+          const res = await fetch('/api/rooms?source=chatwork')
+          if (res.ok) {
+            const data = await res.json()
+            setChatworkRooms(Array.isArray(data) ? data : [])
+          }
+          break
+        }
+        case 'teams': {
+          const res = await fetch('/api/rooms?source=teams')
+          if (res.ok) {
+            const data = await res.json()
+            setTeamsRooms(Array.isArray(data) ? data : [])
+          }
+          break
+        }
+        case 'lark': {
+          const res = await fetch('/api/rooms?source=lark')
+          if (res.ok) {
+            const data = await res.json()
+            setLarkRooms(Array.isArray(data) ? data : [])
+          }
+          break
+        }
+        case 'slack': {
+          const res = await fetch('/api/slack/workspaces')
+          if (res.ok) {
+            const data = await res.json()
+            setSlackWorkspaces(Array.isArray(data) ? data : [])
+          }
+          break
+        }
+      }
+      setLoadedTabs(prev => new Set([...prev, tab]))
+    } catch (error) {
+      console.error(`Failed to fetch ${tab} data:`, error)
+    } finally {
+      setTabLoading(null)
+    }
+  }
+
+  // タブ切り替え時にデータ取得
+  function handleTabChange(tab: Tab) {
+    setActiveTab(tab)
+    if (tab !== 'general') {
+      fetchTabData(tab)
     }
   }
 
@@ -226,7 +264,13 @@ export default function SettingsPage() {
         setNewWorkspaceName('')
         setNewBotToken('')
         setNewSigningSecret('')
-        fetchData()
+        // Slack タブのデータを再取得
+        setLoadedTabs(prev => {
+          const next = new Set(prev)
+          next.delete('slack')
+          return next
+        })
+        fetchTabData('slack')
       } else {
         setMessage('ワークスペースの追加に失敗しました')
       }
@@ -312,7 +356,13 @@ export default function SettingsPage() {
         setNewSlackChannelId('')
         setNewSlackChannelName('')
         fetchSlackChannels(selectedWorkspace)
-        fetchData()
+        // ワークスペース一覧のチャンネル数を更新するため再取得
+        setLoadedTabs(prev => {
+          const next = new Set(prev)
+          next.delete('slack')
+          return next
+        })
+        fetchTabData('slack')
       } else {
         setMessage('チャンネルの追加に失敗しました')
       }
@@ -378,7 +428,15 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage('Chatwork設定を保存しました')
         setApiToken('')
-        fetchData()
+        // 設定を再取得
+        fetchInitialData()
+        // Chatworkタブのデータを再取得
+        setLoadedTabs(prev => {
+          const next = new Set(prev)
+          next.delete('chatwork')
+          return next
+        })
+        fetchTabData('chatwork')
       } else {
         setMessage('保存に失敗しました')
       }
@@ -410,7 +468,8 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage('Teams設定を保存しました')
         setTeamsSecret('')
-        fetchData()
+        // 設定を再取得
+        fetchInitialData()
       } else {
         setMessage('保存に失敗しました')
       }
@@ -470,7 +529,13 @@ export default function SettingsPage() {
         setMessage('チャネルを追加しました')
         setNewChannelId('')
         setNewChannelName('')
-        fetchData()
+        // Teamsタブのデータを再取得
+        setLoadedTabs(prev => {
+          const next = new Set(prev)
+          next.delete('teams')
+          return next
+        })
+        fetchTabData('teams')
       } else {
         setMessage('チャネルの追加に失敗しました')
       }
@@ -527,7 +592,8 @@ export default function SettingsPage() {
         setLarkAppSecret('')
         setLarkVerificationToken('')
         setLarkEncryptKey('')
-        fetchData()
+        // 設定を再取得
+        fetchInitialData()
       } else {
         setMessage('保存に失敗しました')
       }
@@ -559,7 +625,13 @@ export default function SettingsPage() {
         setMessage('チャットを追加しました')
         setNewLarkChatId('')
         setNewLarkChatName('')
-        fetchData()
+        // Larkタブのデータを再取得
+        setLoadedTabs(prev => {
+          const next = new Set(prev)
+          next.delete('lark')
+          return next
+        })
+        fetchTabData('lark')
       } else {
         setMessage('チャットの追加に失敗しました')
       }
@@ -628,7 +700,8 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage('通知設定を保存しました')
         setResendApiKey('')
-        fetchData()
+        // 設定を再取得
+        fetchInitialData()
       } else {
         setMessage('保存に失敗しました')
       }
@@ -693,7 +766,7 @@ export default function SettingsPage() {
       <div className="border-b border-gray-200">
         <nav className="flex gap-4">
           <button
-            onClick={() => setActiveTab('general')}
+            onClick={() => handleTabChange('general')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'general'
                 ? 'border-teal-600 text-teal-600'
@@ -706,7 +779,7 @@ export default function SettingsPage() {
             </span>
           </button>
           <button
-            onClick={() => setActiveTab('chatwork')}
+            onClick={() => handleTabChange('chatwork')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'chatwork'
                 ? 'border-green-600 text-green-600'
@@ -714,12 +787,16 @@ export default function SettingsPage() {
             }`}
           >
             <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              {tabLoading === 'chatwork' ? (
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              )}
               Chatwork
             </span>
           </button>
           <button
-            onClick={() => setActiveTab('teams')}
+            onClick={() => handleTabChange('teams')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'teams'
                 ? 'border-purple-600 text-purple-600'
@@ -727,12 +804,16 @@ export default function SettingsPage() {
             }`}
           >
             <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+              {tabLoading === 'teams' ? (
+                <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+              )}
               Microsoft Teams
             </span>
           </button>
           <button
-            onClick={() => setActiveTab('lark')}
+            onClick={() => handleTabChange('lark')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'lark'
                 ? 'border-blue-600 text-blue-600'
@@ -740,12 +821,16 @@ export default function SettingsPage() {
             }`}
           >
             <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              {tabLoading === 'lark' ? (
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              )}
               Lark
             </span>
           </button>
           <button
-            onClick={() => setActiveTab('slack')}
+            onClick={() => handleTabChange('slack')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'slack'
                 ? 'border-pink-600 text-pink-600'
@@ -753,7 +838,11 @@ export default function SettingsPage() {
             }`}
           >
             <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+              {tabLoading === 'slack' ? (
+                <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse"></span>
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+              )}
               Slack
             </span>
           </button>
