@@ -127,7 +127,8 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      {/* ヘッダー */}
+      <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900">タスク一覧</h1>
           <button
@@ -141,75 +142,91 @@ export default function Dashboard() {
             更新
           </button>
         </div>
-        <div className="flex gap-4">
+        <span className="text-sm text-gray-500">
+          {filteredTasks.length} 件
+        </span>
+      </div>
+
+      {/* フィルター */}
+      <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+        <div className="flex flex-wrap items-center gap-4">
           {/* ステータスフィルター */}
-          <div className="flex gap-1">
-            {['all', 'pending', 'in_progress', 'completed'].map(status => (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 font-medium">ステータス</span>
+            <div className="flex rounded-lg border overflow-hidden">
+              {['all', 'pending', 'in_progress', 'completed'].map(status => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-r last:border-r-0 ${
+                    statusFilter === status
+                      ? 'bg-gray-800 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {status === 'all' ? 'すべて' : statusLabels[status as keyof typeof statusLabels]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="w-px h-6 bg-gray-200" />
+
+          {/* ソースフィルター */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 font-medium">連携</span>
+            <div className="flex gap-1">
               <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  statusFilter === status
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 border hover:bg-gray-50'
+                onClick={() => setSourceFilter('all')}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  sourceFilter === 'all'
+                    ? 'bg-gray-800 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                {status === 'all' ? 'すべて' : statusLabels[status as keyof typeof statusLabels]}
+                すべて
               </button>
-            ))}
-          </div>
-          {/* ソースフィルター */}
-          <div className="flex gap-1">
-            <button
-              onClick={() => setSourceFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                sourceFilter === 'all'
-                  ? 'bg-gray-700 text-white'
-                  : 'bg-white text-gray-700 border hover:bg-gray-50'
-              }`}
-            >
-              全連携
-            </button>
-            <button
-              onClick={() => setSourceFilter('chatwork')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                sourceFilter === 'chatwork'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-white text-gray-700 border hover:bg-gray-50'
-              }`}
-            >
-              CW
-            </button>
-            <button
-              onClick={() => setSourceFilter('teams')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                sourceFilter === 'teams'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-gray-700 border hover:bg-gray-50'
-              }`}
-            >
-              Teams
-            </button>
-            <button
-              onClick={() => setSourceFilter('lark')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                sourceFilter === 'lark'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 border hover:bg-gray-50'
-              }`}
-            >
-              Lark
-            </button>
-            <button
-              onClick={() => setSourceFilter('slack')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                sourceFilter === 'slack'
-                  ? 'bg-pink-600 text-white'
-                  : 'bg-white text-gray-700 border hover:bg-gray-50'
-              }`}
-            >
-              Slack
-            </button>
+              <button
+                onClick={() => setSourceFilter('chatwork')}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  sourceFilter === 'chatwork'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-green-50 text-green-700 hover:bg-green-100'
+                }`}
+              >
+                CW
+              </button>
+              <button
+                onClick={() => setSourceFilter('teams')}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  sourceFilter === 'teams'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                }`}
+              >
+                Teams
+              </button>
+              <button
+                onClick={() => setSourceFilter('lark')}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  sourceFilter === 'lark'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                }`}
+              >
+                Lark
+              </button>
+              <button
+                onClick={() => setSourceFilter('slack')}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  sourceFilter === 'slack'
+                    ? 'bg-pink-600 text-white'
+                    : 'bg-pink-50 text-pink-700 hover:bg-pink-100'
+                }`}
+              >
+                Slack
+              </button>
+            </div>
           </div>
         </div>
       </div>
