@@ -56,7 +56,8 @@ const statusColors = {
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
 
   useEffect(() => {
     fetchTasks()
@@ -105,9 +106,11 @@ export default function Dashboard() {
     }
   }
 
-  const filteredTasks = filter === 'all'
-    ? tasks
-    : tasks.filter(task => task.status === filter)
+  const filteredTasks = tasks.filter(task => {
+    const statusMatch = statusFilter === 'all' || task.status === statusFilter
+    const sourceMatch = sourceFilter === 'all' || task.source === sourceFilter
+    return statusMatch && sourceMatch
+  })
 
   if (loading) {
     return (
@@ -138,20 +141,76 @@ export default function Dashboard() {
             更新
           </button>
         </div>
-        <div className="flex gap-2">
-          {['all', 'pending', 'in_progress', 'completed'].map(status => (
+        <div className="flex gap-4">
+          {/* ステータスフィルター */}
+          <div className="flex gap-1">
+            {['all', 'pending', 'in_progress', 'completed'].map(status => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  statusFilter === status
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 border hover:bg-gray-50'
+                }`}
+              >
+                {status === 'all' ? 'すべて' : statusLabels[status as keyof typeof statusLabels]}
+              </button>
+            ))}
+          </div>
+          {/* ソースフィルター */}
+          <div className="flex gap-1">
             <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === status
+              onClick={() => setSourceFilter('all')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                sourceFilter === 'all'
+                  ? 'bg-gray-700 text-white'
+                  : 'bg-white text-gray-700 border hover:bg-gray-50'
+              }`}
+            >
+              全連携
+            </button>
+            <button
+              onClick={() => setSourceFilter('chatwork')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                sourceFilter === 'chatwork'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-white text-gray-700 border hover:bg-gray-50'
+              }`}
+            >
+              CW
+            </button>
+            <button
+              onClick={() => setSourceFilter('teams')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                sourceFilter === 'teams'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white text-gray-700 border hover:bg-gray-50'
+              }`}
+            >
+              Teams
+            </button>
+            <button
+              onClick={() => setSourceFilter('lark')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                sourceFilter === 'lark'
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 border hover:bg-gray-50'
               }`}
             >
-              {status === 'all' ? 'すべて' : statusLabels[status as keyof typeof statusLabels]}
+              Lark
             </button>
-          ))}
+            <button
+              onClick={() => setSourceFilter('slack')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                sourceFilter === 'slack'
+                  ? 'bg-pink-600 text-white'
+                  : 'bg-white text-gray-700 border hover:bg-gray-50'
+              }`}
+            >
+              Slack
+            </button>
+          </div>
         </div>
       </div>
 
