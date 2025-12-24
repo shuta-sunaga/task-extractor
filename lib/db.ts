@@ -792,7 +792,23 @@ export async function updateUser(id: number, updates: {
   name?: string
   userType?: UserType
   isActive?: boolean
+  companyId?: number | null
 }): Promise<User | null> {
+  // companyIdが明示的に指定された場合は更新する
+  if (updates.companyId !== undefined) {
+    const result = await sql`
+      UPDATE users
+      SET email = COALESCE(${updates.email || null}, email),
+          password_hash = COALESCE(${updates.passwordHash || null}, password_hash),
+          name = COALESCE(${updates.name || null}, name),
+          user_type = COALESCE(${updates.userType || null}, user_type),
+          is_active = COALESCE(${updates.isActive ?? null}, is_active),
+          company_id = ${updates.companyId}
+      WHERE id = ${id}
+      RETURNING *
+    `
+    return (result.rows[0] as User) || null
+  }
   const result = await sql`
     UPDATE users
     SET email = COALESCE(${updates.email || null}, email),

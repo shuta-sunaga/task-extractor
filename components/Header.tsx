@@ -77,13 +77,13 @@ export function Header() {
                 )}
 
                 <div className="flex items-center gap-3 ml-4 pl-4 border-l border-white/30">
-                  <span className="text-white/80 text-sm">
-                    {session.user.name}
+                  <span className="text-white text-sm font-medium">
+                    {session.user.name}さん
                     {isSystemAdmin && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">SYS</span>
+                      <span className="ml-1.5 px-1.5 py-0.5 bg-white/20 rounded text-xs font-normal">SYS</span>
                     )}
-                    {isAdmin && (
-                      <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">管理者</span>
+                    {isAdmin && !isSystemAdmin && (
+                      <span className="ml-1.5 px-1.5 py-0.5 bg-white/20 rounded text-xs font-normal">管理者</span>
                     )}
                   </span>
                   <button

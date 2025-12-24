@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const body = await request.json()
-    const { email, password, name, userType, isActive } = body
+    const { email, password, name, userType, isActive, companyId } = body
 
     // パスワードが指定された場合は強度チェック
     let passwordHash: string | undefined
@@ -82,12 +82,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Cannot promote to system admin' }, { status: 403 })
     }
 
+    // 企業変更はシステム管理者のみ
+    const newCompanyId = isSystemAdmin(currentUser) && companyId !== undefined
+      ? (companyId === null || companyId === '' ? null : companyId)
+      : undefined
+
     const updatedUser = await updateUser(parseInt(id), {
       email,
       passwordHash,
       name,
       userType: userType as UserType | undefined,
       isActive,
+      companyId: newCompanyId,
     })
 
     if (!updatedUser) {
