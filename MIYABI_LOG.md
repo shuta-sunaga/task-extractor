@@ -231,6 +231,76 @@
 
 ---
 
+### セッション 9
+
+#### 指示
+- 企業・ユーザー管理機能の追加
+- ログイン認証機能の実装
+- ロール機能（タスク閲覧制限）の実装
+- システム管理者画面の実装
+
+#### 実施内容
+1. **認証基盤（NextAuth.js）**
+   - `next-auth`, `bcrypt` パッケージ追加
+   - `lib/auth.ts` - NextAuth設定（Credentials Provider）
+   - `lib/password.ts` - bcryptハッシュ（ソルト12ラウンド）
+   - `lib/crypto.ts` - AES-256-GCM暗号化
+   - `lib/session.ts` - 認証ヘルパー関数
+   - `middleware.ts` - 認証ミドルウェア
+   - `types/next-auth.d.ts` - 型定義拡張
+
+2. **DBスキーマ拡張** (`lib/db.ts`)
+   - `companies` テーブル（企業管理）
+   - `users` テーブル（user_type: system_admin/admin/user）
+   - `roles` テーブル（ロール定義）
+   - `role_permissions` テーブル（ルーム×ソースの権限）
+   - `user_roles` テーブル（ユーザーロール紐付け）
+   - 既存テーブルに `company_id` カラム追加
+
+3. **認証UI**
+   - `app/login/page.tsx` - ログインページ
+   - `components/Header.tsx` - 認証対応ヘッダー
+   - `app/providers.tsx` - SessionProvider
+
+4. **ユーザー管理**
+   - `app/api/users/route.ts` - ユーザーCRUD API
+   - `app/api/users/[id]/route.ts` - ユーザー個別操作
+   - `app/admin/users/page.tsx` - ユーザー管理UI
+
+5. **ロール管理**
+   - `app/api/roles/route.ts` - ロールCRUD API
+   - `app/api/roles/[id]/route.ts` - ロール個別操作
+   - `app/api/roles/[id]/permissions/route.ts` - 権限管理
+   - `app/admin/roles/page.tsx` - ロール管理UI（権限マトリックス）
+
+6. **企業管理（システム管理者用）**
+   - `app/api/companies/route.ts` - 企業CRUD API
+   - `app/api/companies/[id]/route.ts` - 企業個別操作
+   - `app/system-admin/page.tsx` - システム管理トップ
+   - `app/system-admin/companies/page.tsx` - 企業管理UI
+
+7. **初期管理者作成**
+   - `app/api/init/route.ts` 更新 - 環境変数から初期システム管理者を作成
+
+#### 備考
+- **ユーザー種別**:
+  - `system_admin`: 全企業横断管理（開発者/運営者）
+  - `admin`: 自社内の全機能 + ユーザー/ロール管理
+  - `user`: ロールに基づくタスク閲覧・ステータス変更
+- **ロール権限**: ルーム × ソースの組み合わせで細かく制御
+- **セキュリティ**: bcryptハッシュ、AES-256-GCM暗号化対応
+- **環境変数追加**:
+  - `NEXTAUTH_URL`, `NEXTAUTH_SECRET`
+  - `ENCRYPTION_KEY`
+  - `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD`
+- **デプロイ手順**:
+  1. 環境変数を設定
+  2. `/api/init` を呼び出し（DBマイグレーション + 初期管理者作成）
+  3. 初期管理者でログイン
+- 既存APIへの認証追加は次回対応予定
+
+---
+
 <!--
 使い方:
 - 新しいセッションごとに「### セッション N」を追加

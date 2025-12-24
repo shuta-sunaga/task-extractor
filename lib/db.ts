@@ -1,6 +1,7 @@
 import { sql } from '@vercel/postgres'
 
 export type Source = 'chatwork' | 'teams' | 'lark' | 'slack'
+export type UserType = 'system_admin' | 'admin' | 'user'
 
 export type SlackWorkspace = {
   id: number
@@ -11,6 +12,50 @@ export type SlackWorkspace = {
   bot_user_id: string | null
   is_active: boolean
   created_at: string
+  company_id: number | null
+}
+
+export type Company = {
+  id: number
+  name: string
+  slug: string
+  is_active: boolean
+  created_at: string
+}
+
+export type User = {
+  id: number
+  company_id: number | null
+  email: string
+  password_hash: string
+  name: string
+  user_type: UserType
+  is_active: boolean
+  last_login_at: string | null
+  created_at: string
+}
+
+export type Role = {
+  id: number
+  company_id: number
+  name: string
+  description: string | null
+  created_at: string
+}
+
+export type RolePermission = {
+  id: number
+  role_id: number
+  room_id: string | null
+  source: Source | null
+  can_view: boolean
+  can_edit_status: boolean
+  can_delete: boolean
+}
+
+export type UserRole = {
+  user_id: number
+  role_id: number
 }
 
 // テーブル作成（初回のみ）+ マイグレーション
@@ -148,6 +193,108 @@ export async function initDatabase() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `
+
+  // ========== マルチテナント・認証関連テーブル ==========
+
+  // Companies テーブル（企業）
+  await sql`
+    CREATE TABLE IF NOT EXISTS companies (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `
+
+  // Users テーブル
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      user_type TEXT NOT NULL CHECK (user_type IN ('system_admin', 'admin', 'user')),
+      is_active BOOLEAN DEFAULT true,
+      last_login_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `
+
+  // Roles テーブル
+  await sql`
+    CREATE TABLE IF NOT EXISTS roles (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `
+
+  // Role Permissions テーブル
+  await sql`
+    CREATE TABLE IF NOT EXISTS role_permissions (
+      id SERIAL PRIMARY KEY,
+      role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+      room_id TEXT,
+      source TEXT,
+      can_view BOOLEAN DEFAULT true,
+      can_edit_status BOOLEAN DEFAULT true,
+      can_delete BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `
+
+  // User Roles テーブル
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_roles (
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, role_id)
+    )
+  `
+
+  // ========== 既存テーブルへの company_id 追加 ==========
+
+  // settings に company_id 追加
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE
+  `
+
+  // rooms に company_id 追加
+  await sql`
+    ALTER TABLE rooms
+    ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE
+  `
+
+  // tasks に company_id 追加
+  await sql`
+    ALTER TABLE tasks
+    ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE
+  `
+
+  // slack_workspaces に company_id 追加
+  await sql`
+    ALTER TABLE slack_workspaces
+    ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE
+  `
+
+  // インデックス作成
+  try {
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_company ON users(company_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_roles_company ON roles(company_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_settings_company ON settings(company_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_rooms_company ON rooms(company_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_tasks_company ON tasks(company_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_slack_workspaces_company ON slack_workspaces(company_id)`
+  } catch {
+    // インデックスが既に存在する場合は無視
+  }
 }
 
 // Settings
@@ -520,4 +667,248 @@ export async function createSlackRoom(roomId: string, roomName: string, workspac
     RETURNING *
   `
   return result.rows[0]
+}
+
+// ========== Companies ==========
+
+export async function getCompanies(): Promise<Company[]> {
+  const result = await sql`
+    SELECT * FROM companies ORDER BY name
+  `
+  return result.rows as Company[]
+}
+
+export async function getCompanyById(id: number): Promise<Company | null> {
+  const result = await sql`
+    SELECT * FROM companies WHERE id = ${id} LIMIT 1
+  `
+  return (result.rows[0] as Company) || null
+}
+
+export async function getCompanyBySlug(slug: string): Promise<Company | null> {
+  const result = await sql`
+    SELECT * FROM companies WHERE slug = ${slug} LIMIT 1
+  `
+  return (result.rows[0] as Company) || null
+}
+
+export async function createCompany(name: string, slug: string): Promise<Company> {
+  const result = await sql`
+    INSERT INTO companies (name, slug)
+    VALUES (${name}, ${slug})
+    RETURNING *
+  `
+  return result.rows[0] as Company
+}
+
+export async function updateCompany(id: number, updates: { name?: string; slug?: string; is_active?: boolean }): Promise<Company | null> {
+  const result = await sql`
+    UPDATE companies
+    SET name = COALESCE(${updates.name || null}, name),
+        slug = COALESCE(${updates.slug || null}, slug),
+        is_active = COALESCE(${updates.is_active ?? null}, is_active)
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return (result.rows[0] as Company) || null
+}
+
+export async function deleteCompany(id: number): Promise<void> {
+  await sql`DELETE FROM companies WHERE id = ${id}`
+}
+
+// ========== Users ==========
+
+export async function getUsers(companyId?: number): Promise<User[]> {
+  if (companyId) {
+    const result = await sql`
+      SELECT * FROM users WHERE company_id = ${companyId} ORDER BY name
+    `
+    return result.rows as User[]
+  }
+  const result = await sql`SELECT * FROM users ORDER BY name`
+  return result.rows as User[]
+}
+
+export async function getUserById(id: number): Promise<User | null> {
+  const result = await sql`
+    SELECT * FROM users WHERE id = ${id} LIMIT 1
+  `
+  return (result.rows[0] as User) || null
+}
+
+export async function getUserByEmail(email: string): Promise<User | null> {
+  const result = await sql`
+    SELECT * FROM users WHERE email = ${email} LIMIT 1
+  `
+  return (result.rows[0] as User) || null
+}
+
+export async function createUser(user: {
+  companyId: number | null
+  email: string
+  passwordHash: string
+  name: string
+  userType: UserType
+}): Promise<User> {
+  const result = await sql`
+    INSERT INTO users (company_id, email, password_hash, name, user_type)
+    VALUES (${user.companyId}, ${user.email}, ${user.passwordHash}, ${user.name}, ${user.userType})
+    RETURNING *
+  `
+  return result.rows[0] as User
+}
+
+export async function updateUser(id: number, updates: {
+  email?: string
+  passwordHash?: string
+  name?: string
+  userType?: UserType
+  isActive?: boolean
+}): Promise<User | null> {
+  const result = await sql`
+    UPDATE users
+    SET email = COALESCE(${updates.email || null}, email),
+        password_hash = COALESCE(${updates.passwordHash || null}, password_hash),
+        name = COALESCE(${updates.name || null}, name),
+        user_type = COALESCE(${updates.userType || null}, user_type),
+        is_active = COALESCE(${updates.isActive ?? null}, is_active)
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return (result.rows[0] as User) || null
+}
+
+export async function updateLastLogin(id: number): Promise<void> {
+  await sql`
+    UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ${id}
+  `
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  await sql`DELETE FROM users WHERE id = ${id}`
+}
+
+// ========== Roles ==========
+
+export async function getRoles(companyId: number): Promise<Role[]> {
+  const result = await sql`
+    SELECT * FROM roles WHERE company_id = ${companyId} ORDER BY name
+  `
+  return result.rows as Role[]
+}
+
+export async function getRoleById(id: number): Promise<Role | null> {
+  const result = await sql`
+    SELECT * FROM roles WHERE id = ${id} LIMIT 1
+  `
+  return (result.rows[0] as Role) || null
+}
+
+export async function createRole(companyId: number, name: string, description?: string): Promise<Role> {
+  const result = await sql`
+    INSERT INTO roles (company_id, name, description)
+    VALUES (${companyId}, ${name}, ${description || null})
+    RETURNING *
+  `
+  return result.rows[0] as Role
+}
+
+export async function updateRole(id: number, updates: { name?: string; description?: string }): Promise<Role | null> {
+  const result = await sql`
+    UPDATE roles
+    SET name = COALESCE(${updates.name || null}, name),
+        description = COALESCE(${updates.description || null}, description)
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return (result.rows[0] as Role) || null
+}
+
+export async function deleteRole(id: number): Promise<void> {
+  await sql`DELETE FROM roles WHERE id = ${id}`
+}
+
+// ========== Role Permissions ==========
+
+export async function getRolePermissions(roleId: number): Promise<RolePermission[]> {
+  const result = await sql`
+    SELECT * FROM role_permissions WHERE role_id = ${roleId}
+  `
+  return result.rows as RolePermission[]
+}
+
+export async function addRolePermission(permission: {
+  roleId: number
+  roomId?: string | null
+  source?: Source | null
+  canView?: boolean
+  canEditStatus?: boolean
+  canDelete?: boolean
+}): Promise<RolePermission> {
+  const result = await sql`
+    INSERT INTO role_permissions (role_id, room_id, source, can_view, can_edit_status, can_delete)
+    VALUES (${permission.roleId}, ${permission.roomId || null}, ${permission.source || null}, ${permission.canView ?? true}, ${permission.canEditStatus ?? true}, ${permission.canDelete ?? false})
+    RETURNING *
+  `
+  return result.rows[0] as RolePermission
+}
+
+export async function deleteRolePermission(id: number): Promise<void> {
+  await sql`DELETE FROM role_permissions WHERE id = ${id}`
+}
+
+export async function deleteRolePermissionsByRole(roleId: number): Promise<void> {
+  await sql`DELETE FROM role_permissions WHERE role_id = ${roleId}`
+}
+
+// ========== User Roles ==========
+
+export async function getUserRoles(userId: number): Promise<Role[]> {
+  const result = await sql`
+    SELECT r.* FROM roles r
+    INNER JOIN user_roles ur ON r.id = ur.role_id
+    WHERE ur.user_id = ${userId}
+  `
+  return result.rows as Role[]
+}
+
+export async function addUserRole(userId: number, roleId: number): Promise<void> {
+  await sql`
+    INSERT INTO user_roles (user_id, role_id)
+    VALUES (${userId}, ${roleId})
+    ON CONFLICT (user_id, role_id) DO NOTHING
+  `
+}
+
+export async function removeUserRole(userId: number, roleId: number): Promise<void> {
+  await sql`DELETE FROM user_roles WHERE user_id = ${userId} AND role_id = ${roleId}`
+}
+
+export async function getUserRolePermissions(userId: number): Promise<RolePermission[]> {
+  const result = await sql`
+    SELECT rp.* FROM role_permissions rp
+    INNER JOIN user_roles ur ON rp.role_id = ur.role_id
+    WHERE ur.user_id = ${userId}
+  `
+  return result.rows as RolePermission[]
+}
+
+// ========== 初期データ投入 ==========
+
+export async function createInitialSystemAdmin(email: string, passwordHash: string, name: string): Promise<User> {
+  // 既存のシステム管理者がいない場合のみ作成
+  const existing = await sql`
+    SELECT * FROM users WHERE user_type = 'system_admin' LIMIT 1
+  `
+  if (existing.rows.length > 0) {
+    return existing.rows[0] as User
+  }
+
+  const result = await sql`
+    INSERT INTO users (company_id, email, password_hash, name, user_type)
+    VALUES (NULL, ${email}, ${passwordHash}, ${name}, 'system_admin')
+    RETURNING *
+  `
+  return result.rows[0] as User
 }
