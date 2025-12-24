@@ -612,8 +612,17 @@ export async function createTask(task: {
   senderName: string
   priority: string
   source?: Source
+  companyId?: number
 }) {
   const source = task.source || 'chatwork'
+  if (task.companyId) {
+    const result = await sql`
+      INSERT INTO tasks (room_id, message_id, content, original_message, sender_name, priority, source, company_id)
+      VALUES (${task.roomId}, ${task.messageId}, ${task.content}, ${task.originalMessage}, ${task.senderName}, ${task.priority}, ${source}, ${task.companyId})
+      RETURNING *
+    `
+    return result.rows[0]
+  }
   const result = await sql`
     INSERT INTO tasks (room_id, message_id, content, original_message, sender_name, priority, source)
     VALUES (${task.roomId}, ${task.messageId}, ${task.content}, ${task.originalMessage}, ${task.senderName}, ${task.priority}, ${source})
@@ -723,11 +732,11 @@ export async function getActiveRoomsByWorkspace(workspaceId: string) {
   return result.rows
 }
 
-export async function createSlackRoom(roomId: string, roomName: string, workspaceId: string) {
+export async function createSlackRoom(roomId: string, roomName: string, workspaceId: string, companyId?: number) {
   const result = await sql`
-    INSERT INTO rooms (room_id, room_name, source, workspace_id, is_active)
-    VALUES (${roomId}, ${roomName}, 'slack', ${workspaceId}, true)
-    ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}, workspace_id = ${workspaceId}
+    INSERT INTO rooms (room_id, room_name, source, workspace_id, is_active, company_id)
+    VALUES (${roomId}, ${roomName}, 'slack', ${workspaceId}, true, ${companyId ?? null})
+    ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}, workspace_id = ${workspaceId}, company_id = COALESCE(${companyId ?? null}, rooms.company_id)
     RETURNING *
   `
   return result.rows[0]

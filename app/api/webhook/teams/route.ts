@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
     console.log('[Teams Webhook] Received request')
 
-    // 設定取得
+    // Webhookは認証なしで呼ばれるため、設定をフィルタなしで取得
     const settings = await getSettings()
     if (!settings?.teams_webhook_secret) {
       console.error('[Teams Webhook] Secret not configured')
@@ -34,9 +34,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
+    // 設定から企業IDを取得
+    const companyId = settings.company_id as number | undefined
+
     // ペイロード解析
     const payload: TeamsWebhookPayload = JSON.parse(rawBody)
-    console.log('[Teams Webhook] Type:', payload.type, 'Conversation:', payload.conversation?.id)
+    console.log('[Teams Webhook] Type:', payload.type, 'Conversation:', payload.conversation?.id, 'Company:', companyId)
 
     // メッセージタイプの確認
     if (payload.type !== 'message') {
@@ -48,8 +51,8 @@ export async function POST(request: Request) {
     const message = parseTeamsPayload(payload)
     console.log('[Teams Webhook] Sender:', message.senderName, 'Text:', message.text)
 
-    // アクティブなTeamsチャネルを確認
-    const activeRooms = await getActiveRoomsBySource('teams')
+    // 企業のアクティブなTeamsチャネルを確認
+    const activeRooms = await getActiveRoomsBySource('teams', companyId)
     console.log('[Teams Webhook] Active channels:', activeRooms.map(r => r.room_id))
 
     const isActiveRoom = activeRooms.some(
@@ -79,7 +82,7 @@ export async function POST(request: Request) {
     }
 
     // タスク作成
-    console.log('[Teams Webhook] Creating task...')
+    console.log('[Teams Webhook] Creating task for company:', companyId)
     const task = await createTask({
       roomId: message.conversationId,
       messageId: message.activityId,
@@ -88,6 +91,7 @@ export async function POST(request: Request) {
       senderName: message.senderName,
       priority: analysis.priority,
       source: 'teams',
+      companyId,
     })
 
     console.log('[Teams Webhook] Task created:', task.id)

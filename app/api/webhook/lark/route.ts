@@ -28,6 +28,9 @@ export async function POST(request: Request) {
     // 設定取得
     const settings = await getSettings()
 
+    // 設定から企業IDを取得
+    const companyId = settings?.company_id as number | undefined
+
     // 暗号化されている場合は復号
     if (payload.encrypt && settings?.lark_encrypt_key) {
       console.log('[Lark Webhook] Decrypting payload')
@@ -75,10 +78,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true })
     }
 
-    console.log('[Lark Webhook] Chat:', message.chatId, 'Text:', message.text)
+    console.log('[Lark Webhook] Chat:', message.chatId, 'Text:', message.text, 'Company:', companyId)
 
-    // アクティブなLarkチャットを確認
-    const activeRooms = await getActiveRoomsBySource('lark')
+    // 企業のアクティブなLarkチャットを確認
+    const activeRooms = await getActiveRoomsBySource('lark', companyId)
     console.log('[Lark Webhook] Active chats:', activeRooms.map(r => r.room_id))
 
     const isActiveRoom = activeRooms.some(room => room.room_id === message.chatId)
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
     }
 
     // タスク作成
-    console.log('[Lark Webhook] Creating task...')
+    console.log('[Lark Webhook] Creating task for company:', companyId)
     const task = await createTask({
       roomId: message.chatId,
       messageId: message.messageId,
@@ -115,6 +118,7 @@ export async function POST(request: Request) {
       senderName: message.senderOpenId, // TODO: APIでユーザー名を取得
       priority: analysis.priority,
       source: 'lark',
+      companyId,
     })
 
     console.log('[Lark Webhook] Task created:', task.id)

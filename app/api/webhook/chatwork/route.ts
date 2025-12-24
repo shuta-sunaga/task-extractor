@@ -11,6 +11,7 @@ export async function POST(request: Request) {
 
     console.log('[Webhook] Received request')
 
+    // Webhookは認証なしで呼ばれるため、設定をフィルタなしで取得
     const settings = await getSettings()
     if (!settings?.webhook_token) {
       console.error('[Webhook] Token not configured')
@@ -22,8 +23,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
+    // 設定から企業IDを取得
+    const companyId = settings.company_id as number | undefined
+
     const payload: WebhookPayload = JSON.parse(rawBody)
-    console.log('[Webhook] Event:', payload.webhook_event_type, 'Room:', payload.webhook_event?.room_id)
+    console.log('[Webhook] Event:', payload.webhook_event_type, 'Room:', payload.webhook_event?.room_id, 'Company:', companyId)
 
     if (payload.webhook_event_type !== 'message_created') {
       console.log('[Webhook] Not message_created, skip')
@@ -32,9 +36,10 @@ export async function POST(request: Request) {
 
     const event = payload.webhook_event
 
-    const activeRooms = await getActiveRooms()
+    // 企業のアクティブルームを取得
+    const activeRooms = await getActiveRooms(companyId)
     console.log('[Webhook] Active rooms:', activeRooms.map(r => r.room_id))
-    
+
     const isActiveRoom = activeRooms.some(
       room => room.room_id === String(event.room_id)
     )
@@ -64,7 +69,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Message is not a task' })
     }
 
-    console.log('[Webhook] Creating task...')
+    console.log('[Webhook] Creating task for company:', companyId)
     const task = await createTask({
       roomId: String(event.room_id),
       messageId: event.message_id,
@@ -72,6 +77,7 @@ export async function POST(request: Request) {
       originalMessage: event.body,
       senderName,
       priority: analysis.priority,
+      companyId,
     })
 
     console.log('[Webhook] Task created:', task.id)

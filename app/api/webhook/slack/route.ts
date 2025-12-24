@@ -46,6 +46,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true })
     }
 
+    // ワークスペースから企業IDを取得
+    const companyId = workspace.company_id as number | undefined
+    console.log('[Slack Webhook] Team:', teamId, 'Company:', companyId)
+
     // 署名検証
     if (!verifySlackSignature(workspace.signing_secret, signature, timestamp, rawBody)) {
       console.error('[Slack Webhook] Invalid signature for workspace:', teamId)
@@ -63,8 +67,8 @@ export async function POST(request: Request) {
         const channelName = channelInfo.ok ? channelInfo.channelName! : joinEvent.channelId
 
         // チャンネルを自動登録
-        await createSlackRoom(joinEvent.channelId, channelName, teamId)
-        console.log('[Slack Webhook] Auto-registered channel:', channelName, '(', joinEvent.channelId, ')')
+        await createSlackRoom(joinEvent.channelId, channelName, teamId, companyId)
+        console.log('[Slack Webhook] Auto-registered channel:', channelName, '(', joinEvent.channelId, ') for company:', companyId)
 
         return NextResponse.json({ ok: true })
       }
@@ -118,7 +122,7 @@ export async function POST(request: Request) {
     }
 
     // タスク作成
-    console.log('[Slack Webhook] Creating task...')
+    console.log('[Slack Webhook] Creating task for company:', companyId)
     const task = await createTask({
       roomId: message.channelId,
       messageId: message.messageId,
@@ -127,6 +131,7 @@ export async function POST(request: Request) {
       senderName: message.userId, // TODO: APIでユーザー名を取得
       priority: analysis.priority,
       source: 'slack',
+      companyId,
     })
 
     console.log('[Slack Webhook] Task created:', task.id)
