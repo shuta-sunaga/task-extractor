@@ -301,6 +301,60 @@
 
 ---
 
+### セッション 10
+
+#### 指示
+- システム管理者と企業ユーザーのアクセス制御を分離
+- 企業ごとのURL構造（/[slug]/）を実装
+- ヘッダーナビゲーションをユーザー種別で切り替え
+- 既存データを株式会社Sei San Seiに紐づけ
+
+#### 実施内容
+1. **動的ルート構造** (`app/[slug]/`)
+   - `/[slug]/` - 企業別ダッシュボード
+   - `/[slug]/settings` - 企業別設定画面
+   - `/[slug]/admin` - 企業別管理ハブ
+   - `/[slug]/admin/users` - ユーザー管理
+   - `/[slug]/admin/roles` - ロール管理
+
+2. **アクセス制御**
+   - `middleware.ts` - 企業slug検証、ユーザー種別によるアクセス制御
+   - 他社のslugへのアクセスは自社ページへリダイレクト
+   - 一般ユーザーは `/[slug]/admin`, `/[slug]/settings` にアクセス不可
+
+3. **リダイレクトロジック** (`app/page.tsx`)
+   - システム管理者 → `/system-admin`
+   - 企業ユーザー → `/[自社slug]/`
+
+4. **ヘッダー更新** (`components/Header.tsx`)
+   - システム管理者: 「企業管理」リンクのみ
+   - 企業管理者: 「ダッシュボード」「設定」「管理」リンク
+   - 一般ユーザー: 「ダッシュボード」リンクのみ
+
+5. **セッション拡張** (`lib/auth.ts`, `types/next-auth.d.ts`)
+   - `companySlug` をセッションに追加
+
+6. **データフィルタリング**
+   - `lib/db.ts` - `getTasks()`, `getSettings()`, `getRooms()` に `companyId` パラメータ追加
+   - `app/api/tasks/route.ts` - セッションの `companyId` でフィルタリング
+
+7. **データ移行** (`app/api/init/route.ts`)
+   - 既存データ（settings, rooms, tasks, slack_workspaces）を株式会社Sei San Seiに紐づけ
+
+8. **不要ファイル削除**
+   - 古い `/admin`, `/settings` ディレクトリを削除
+
+#### 備考
+- **アクセスモデル**:
+  - システム管理者: `/system-admin` のみ
+  - 企業管理者: `/[slug]/`, `/[slug]/settings`, `/[slug]/admin`
+  - 一般ユーザー: `/[slug]/` のみ
+- **403エラー**: 各ページでインライン表示（「無効なURLです」）
+- **デプロイ後**: `/api/init` を呼び出してデータ移行実行
+- 株式会社Sei San Seiのslugは `seisansei`
+
+---
+
 <!--
 使い方:
 - 新しいセッションごとに「### セッション N」を追加
