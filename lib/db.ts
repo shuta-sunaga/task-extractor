@@ -310,9 +310,10 @@ export async function getSettings(companyId?: number) {
 export async function saveSettings(
   chatworkApiToken: string,
   webhookToken: string,
-  teamsWebhookSecret?: string
+  teamsWebhookSecret?: string,
+  companyId?: number
 ) {
-  const existing = await getSettings()
+  const existing = await getSettings(companyId)
   if (existing) {
     if (teamsWebhookSecret !== undefined) {
       await sql`
@@ -332,14 +333,14 @@ export async function saveSettings(
     }
   } else {
     await sql`
-      INSERT INTO settings (chatwork_api_token, webhook_token, teams_webhook_secret)
-      VALUES (${chatworkApiToken}, ${webhookToken}, ${teamsWebhookSecret || null})
+      INSERT INTO settings (chatwork_api_token, webhook_token, teams_webhook_secret, company_id)
+      VALUES (${chatworkApiToken}, ${webhookToken}, ${teamsWebhookSecret || null}, ${companyId || null})
     `
   }
 }
 
-export async function saveTeamsSettings(teamsWebhookSecret: string) {
-  const existing = await getSettings()
+export async function saveTeamsSettings(teamsWebhookSecret: string, companyId?: number) {
+  const existing = await getSettings(companyId)
   if (existing) {
     await sql`
       UPDATE settings
@@ -348,8 +349,8 @@ export async function saveTeamsSettings(teamsWebhookSecret: string) {
     `
   } else {
     await sql`
-      INSERT INTO settings (teams_webhook_secret)
-      VALUES (${teamsWebhookSecret})
+      INSERT INTO settings (teams_webhook_secret, company_id)
+      VALUES (${teamsWebhookSecret}, ${companyId || null})
     `
   }
 }
@@ -359,8 +360,8 @@ export async function saveLarkSettings(larkSettings: {
   appSecret?: string
   verificationToken?: string
   encryptKey?: string
-}) {
-  const existing = await getSettings()
+}, companyId?: number) {
+  const existing = await getSettings(companyId)
   if (existing) {
     await sql`
       UPDATE settings
@@ -372,8 +373,8 @@ export async function saveLarkSettings(larkSettings: {
     `
   } else {
     await sql`
-      INSERT INTO settings (lark_app_id, lark_app_secret, lark_verification_token, lark_encrypt_key)
-      VALUES (${larkSettings.appId || null}, ${larkSettings.appSecret || null}, ${larkSettings.verificationToken || null}, ${larkSettings.encryptKey || null})
+      INSERT INTO settings (lark_app_id, lark_app_secret, lark_verification_token, lark_encrypt_key, company_id)
+      VALUES (${larkSettings.appId || null}, ${larkSettings.appSecret || null}, ${larkSettings.verificationToken || null}, ${larkSettings.encryptKey || null}, ${companyId || null})
     `
   }
 }
@@ -387,8 +388,8 @@ export type NotificationSettings = {
   resend_api_key: string
 }
 
-export async function getNotificationSettings(): Promise<NotificationSettings> {
-  const settings = await getSettings()
+export async function getNotificationSettings(companyId?: number): Promise<NotificationSettings> {
+  const settings = await getSettings(companyId)
   if (!settings) {
     return {
       notification_emails: [],
@@ -412,8 +413,8 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
   }
 }
 
-export async function saveNotificationSettings(notificationSettings: Omit<NotificationSettings, 'resend_api_key'> & { resend_api_key?: string }) {
-  const existing = await getSettings()
+export async function saveNotificationSettings(notificationSettings: Omit<NotificationSettings, 'resend_api_key'> & { resend_api_key?: string }, companyId?: number) {
+  const existing = await getSettings(companyId)
   const emailsStr = notificationSettings.notification_emails.join(',')
 
   if (existing) {
@@ -439,8 +440,8 @@ export async function saveNotificationSettings(notificationSettings: Omit<Notifi
     }
   } else {
     await sql`
-      INSERT INTO settings (notification_emails, notify_on_create, notify_on_complete, notify_on_delete, resend_api_key)
-      VALUES (${emailsStr}, ${notificationSettings.notify_on_create}, ${notificationSettings.notify_on_complete}, ${notificationSettings.notify_on_delete}, ${notificationSettings.resend_api_key || null})
+      INSERT INTO settings (notification_emails, notify_on_create, notify_on_complete, notify_on_delete, resend_api_key, company_id)
+      VALUES (${emailsStr}, ${notificationSettings.notify_on_create}, ${notificationSettings.notify_on_complete}, ${notificationSettings.notify_on_delete}, ${notificationSettings.resend_api_key || null}, ${companyId || null})
     `
   }
 }
@@ -455,7 +456,15 @@ export async function getRooms(companyId?: number) {
   return result.rows
 }
 
-export async function getRoomsBySource(source: Source) {
+export async function getRoomsBySource(source: Source, companyId?: number) {
+  if (companyId) {
+    const result = await sql`
+      SELECT * FROM rooms
+      WHERE source = ${source} AND company_id = ${companyId}
+      ORDER BY room_name
+    `
+    return result.rows
+  }
   const result = await sql`
     SELECT * FROM rooms
     WHERE source = ${source}
@@ -464,12 +473,23 @@ export async function getRoomsBySource(source: Source) {
   return result.rows
 }
 
-export async function getActiveRooms() {
+export async function getActiveRooms(companyId?: number) {
+  if (companyId) {
+    const result = await sql`SELECT * FROM rooms WHERE is_active = true AND company_id = ${companyId}`
+    return result.rows
+  }
   const result = await sql`SELECT * FROM rooms WHERE is_active = true`
   return result.rows
 }
 
-export async function getActiveRoomsBySource(source: Source) {
+export async function getActiveRoomsBySource(source: Source, companyId?: number) {
+  if (companyId) {
+    const result = await sql`
+      SELECT * FROM rooms
+      WHERE is_active = true AND source = ${source} AND company_id = ${companyId}
+    `
+    return result.rows
+  }
   const result = await sql`
     SELECT * FROM rooms
     WHERE is_active = true AND source = ${source}
@@ -477,15 +497,32 @@ export async function getActiveRoomsBySource(source: Source) {
   return result.rows
 }
 
-export async function upsertRoom(roomId: string, roomName: string, source: Source = 'chatwork') {
-  await sql`
-    INSERT INTO rooms (room_id, room_name, source)
-    VALUES (${roomId}, ${roomName}, ${source})
-    ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}
-  `
+export async function upsertRoom(roomId: string, roomName: string, source: Source = 'chatwork', companyId?: number) {
+  if (companyId) {
+    await sql`
+      INSERT INTO rooms (room_id, room_name, source, company_id)
+      VALUES (${roomId}, ${roomName}, ${source}, ${companyId})
+      ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}, company_id = ${companyId}
+    `
+  } else {
+    await sql`
+      INSERT INTO rooms (room_id, room_name, source)
+      VALUES (${roomId}, ${roomName}, ${source})
+      ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}
+    `
+  }
 }
 
-export async function createRoom(roomId: string, roomName: string, source: Source) {
+export async function createRoom(roomId: string, roomName: string, source: Source, companyId?: number) {
+  if (companyId) {
+    const result = await sql`
+      INSERT INTO rooms (room_id, room_name, source, is_active, company_id)
+      VALUES (${roomId}, ${roomName}, ${source}, true, ${companyId})
+      ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}, company_id = ${companyId}
+      RETURNING *
+    `
+    return result.rows[0]
+  }
   const result = await sql`
     INSERT INTO rooms (room_id, room_name, source, is_active)
     VALUES (${roomId}, ${roomName}, ${source}, true)

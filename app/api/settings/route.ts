@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { getSettings, saveSettings, saveTeamsSettings, saveLarkSettings, getNotificationSettings, saveNotificationSettings } from '@/lib/db'
 
 export async function GET() {
   try {
-    const settings = await getSettings()
-    const notificationSettings = await getNotificationSettings()
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId ?? undefined
+
+    const settings = await getSettings(companyId)
+    const notificationSettings = await getNotificationSettings(companyId)
 
     if (!settings) {
       return NextResponse.json({
@@ -61,6 +66,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    const companyId = session?.user?.companyId ?? undefined
+
     const body = await request.json()
     const {
       chatworkApiToken,
@@ -82,13 +90,14 @@ export async function POST(request: Request) {
       await saveSettings(
         chatworkApiToken || '',
         webhookToken || '',
-        teamsWebhookSecret
+        teamsWebhookSecret,
+        companyId
       )
     }
 
     // Teams設定のみの保存
     if (teamsWebhookSecret !== undefined && chatworkApiToken === undefined) {
-      await saveTeamsSettings(teamsWebhookSecret)
+      await saveTeamsSettings(teamsWebhookSecret, companyId)
     }
 
     // Lark設定の保存
@@ -98,7 +107,7 @@ export async function POST(request: Request) {
         appSecret: larkAppSecret,
         verificationToken: larkVerificationToken,
         encryptKey: larkEncryptKey,
-      })
+      }, companyId)
     }
 
     // 通知設定の保存
@@ -109,7 +118,7 @@ export async function POST(request: Request) {
         notify_on_complete: notifyOnComplete ?? true,
         notify_on_delete: notifyOnDelete ?? false,
         resend_api_key: resendApiKey,
-      })
+      }, companyId)
     }
 
     return NextResponse.json({ success: true })
