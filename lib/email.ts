@@ -17,7 +17,7 @@ export type TaskInfo = {
   id: number
   content: string
   sender_name: string
-  source: 'chatwork' | 'teams' | 'lark'
+  source: 'chatwork' | 'teams' | 'lark' | 'slack'
   priority: string
   status?: string
 }
@@ -34,6 +34,7 @@ const SOURCE_LABELS: Record<string, string> = {
   chatwork: 'Chatwork',
   teams: 'Teams',
   lark: 'Lark',
+  slack: 'Slack',
 }
 
 const PRIORITY_LABELS: Record<string, string> = {

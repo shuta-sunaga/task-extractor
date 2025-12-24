@@ -7,7 +7,19 @@ type Room = {
   room_id: string
   room_name: string
   is_active: boolean
-  source: 'chatwork' | 'teams' | 'lark'
+  source: 'chatwork' | 'teams' | 'lark' | 'slack'
+  workspace_id?: string
+}
+
+type SlackWorkspace = {
+  id: number
+  workspace_id: string
+  workspace_name: string
+  bot_token: string
+  signing_secret: string
+  is_active: boolean
+  channel_count: number
+  active_channel_count: number
 }
 
 type Settings = {
@@ -27,7 +39,7 @@ type Settings = {
   has_resend_key: boolean
 }
 
-type Tab = 'general' | 'chatwork' | 'teams' | 'lark'
+type Tab = 'general' | 'chatwork' | 'teams' | 'lark' | 'slack'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('general')
@@ -72,6 +84,18 @@ export default function SettingsPage() {
   const [newLarkChatId, setNewLarkChatId] = useState('')
   const [newLarkChatName, setNewLarkChatName] = useState('')
 
+  // Slack用
+  const [slackWorkspaces, setSlackWorkspaces] = useState<SlackWorkspace[]>([])
+  const [newWorkspaceId, setNewWorkspaceId] = useState('')
+  const [newWorkspaceName, setNewWorkspaceName] = useState('')
+  const [newBotToken, setNewBotToken] = useState('')
+  const [newSigningSecret, setNewSigningSecret] = useState('')
+  const [showSlackSecrets, setShowSlackSecrets] = useState(false)
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null)
+  const [slackChannels, setSlackChannels] = useState<Room[]>([])
+  const [newSlackChannelId, setNewSlackChannelId] = useState('')
+  const [newSlackChannelName, setNewSlackChannelName] = useState('')
+
   // 通知設定用
   const [newEmail, setNewEmail] = useState('')
   const [notificationEmails, setNotificationEmails] = useState<string[]>([])
@@ -87,11 +111,12 @@ export default function SettingsPage() {
 
   async function fetchData() {
     try {
-      const [settingsRes, chatworkRoomsRes, teamsRoomsRes, larkRoomsRes] = await Promise.all([
+      const [settingsRes, chatworkRoomsRes, teamsRoomsRes, larkRoomsRes, slackWorkspacesRes] = await Promise.all([
         fetch('/api/settings'),
         fetch('/api/rooms?source=chatwork'),
         fetch('/api/rooms?source=teams'),
         fetch('/api/rooms?source=lark'),
+        fetch('/api/slack/workspaces'),
       ])
 
       if (settingsRes.ok) {
@@ -118,10 +143,173 @@ export default function SettingsPage() {
         const data = await larkRoomsRes.json()
         setLarkRooms(Array.isArray(data) ? data : [])
       }
+
+      if (slackWorkspacesRes.ok) {
+        const data = await slackWorkspacesRes.json()
+        setSlackWorkspaces(Array.isArray(data) ? data : [])
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Slack functions
+  async function addSlackWorkspace() {
+    if (!newWorkspaceId || !newWorkspaceName || !newBotToken || !newSigningSecret) {
+      setMessage('すべての項目を入力してください')
+      return
+    }
+
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/slack/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: newWorkspaceId,
+          workspaceName: newWorkspaceName,
+          botToken: newBotToken,
+          signingSecret: newSigningSecret,
+        }),
+      })
+
+      if (res.ok) {
+        setMessage('ワークスペースを追加しました')
+        setNewWorkspaceId('')
+        setNewWorkspaceName('')
+        setNewBotToken('')
+        setNewSigningSecret('')
+        fetchData()
+      } else {
+        setMessage('ワークスペースの追加に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteSlackWorkspace(workspaceId: string) {
+    if (!confirm('このワークスペースを削除しますか？関連するチャンネルも削除されます。')) return
+
+    try {
+      const res = await fetch(`/api/slack/workspaces?workspaceId=${encodeURIComponent(workspaceId)}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setMessage('ワークスペースを削除しました')
+        setSlackWorkspaces(slackWorkspaces.filter(w => w.workspace_id !== workspaceId))
+        if (selectedWorkspace === workspaceId) {
+          setSelectedWorkspace(null)
+          setSlackChannels([])
+        }
+      } else {
+        setMessage('削除に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    }
+  }
+
+  async function toggleSlackWorkspace(workspaceId: string, isActive: boolean) {
+    try {
+      const res = await fetch('/api/slack/workspaces', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, isActive }),
+      })
+
+      if (res.ok) {
+        setSlackWorkspaces(slackWorkspaces.map(w =>
+          w.workspace_id === workspaceId ? { ...w, is_active: isActive } : w
+        ))
+      }
+    } catch (error) {
+      console.error('Failed to toggle workspace:', error)
+    }
+  }
+
+  async function fetchSlackChannels(workspaceId: string) {
+    try {
+      const res = await fetch(`/api/slack/channels?workspaceId=${encodeURIComponent(workspaceId)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSlackChannels(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch channels:', error)
+    }
+  }
+
+  async function addSlackChannel() {
+    if (!selectedWorkspace || !newSlackChannelId || !newSlackChannelName) {
+      setMessage('チャンネルIDと名前を入力してください')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/slack/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId: newSlackChannelId,
+          channelName: newSlackChannelName,
+          workspaceId: selectedWorkspace,
+        }),
+      })
+
+      if (res.ok) {
+        setMessage('チャンネルを追加しました')
+        setNewSlackChannelId('')
+        setNewSlackChannelName('')
+        fetchSlackChannels(selectedWorkspace)
+        fetchData()
+      } else {
+        setMessage('チャンネルの追加に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    }
+  }
+
+  async function toggleSlackChannel(channelId: string, isActive: boolean) {
+    try {
+      const res = await fetch('/api/slack/channels', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId, isActive }),
+      })
+
+      if (res.ok) {
+        setSlackChannels(slackChannels.map(c =>
+          c.room_id === channelId ? { ...c, is_active: isActive } : c
+        ))
+      }
+    } catch (error) {
+      console.error('Failed to toggle channel:', error)
+    }
+  }
+
+  async function deleteSlackChannel(channelId: string) {
+    try {
+      const res = await fetch(`/api/slack/channels?channelId=${encodeURIComponent(channelId)}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setMessage('チャンネルを削除しました')
+        setSlackChannels(slackChannels.filter(c => c.room_id !== channelId))
+      } else {
+        setMessage('削除に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
     }
   }
 
@@ -433,6 +621,10 @@ export default function SettingsPage() {
     ? `${window.location.origin}/api/webhook/lark`
     : ''
 
+  const slackWebhookUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/webhook/slack`
+    : ''
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -516,6 +708,19 @@ export default function SettingsPage() {
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-500"></span>
               Lark
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('slack')}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'slack'
+                ? 'border-pink-600 text-pink-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+              Slack
             </span>
           </button>
         </nav>
@@ -1165,6 +1370,260 @@ export default function SettingsPage() {
                     >
                       削除
                     </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Slack タブ */}
+      {activeTab === 'slack' && (
+        <div className="space-y-6">
+          {/* Webhook URL */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Webhook URL</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              このURLをSlackアプリのEvent Subscriptions → Request URLに設定してください。
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={slackWebhookUrl}
+                readOnly
+                className="flex-1 px-4 py-2 border rounded-lg bg-gray-50 text-sm"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(slackWebhookUrl)
+                  setMessage('URLをコピーしました')
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                コピー
+              </button>
+            </div>
+            <div className="mt-4 p-4 bg-pink-50 rounded-lg">
+              <h3 className="text-sm font-medium text-pink-800 mb-2">設定手順</h3>
+              <ol className="text-sm text-pink-700 list-decimal list-inside space-y-1">
+                <li>Slack APIでアプリを作成</li>
+                <li>Event Subscriptionsを有効化し、上記URLを設定</li>
+                <li>message.channels、message.groupsイベントを購読</li>
+                <li>OAuth & Permissionsでchannels:history, groups:historyスコープを追加</li>
+                <li>ワークスペースにアプリをインストール</li>
+                <li>Bot TokenとSigning Secretを下記に入力</li>
+              </ol>
+            </div>
+          </div>
+
+          {/* ワークスペース追加 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">ワークスペースを追加</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Slack APIダッシュボードからBot TokenとSigning Secretを取得して入力してください。
+            </p>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ワークスペースID
+                </label>
+                <input
+                  type="text"
+                  value={newWorkspaceId}
+                  onChange={e => setNewWorkspaceId(e.target.value)}
+                  placeholder="T01234ABCDE"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ワークスペース名
+                </label>
+                <input
+                  type="text"
+                  value={newWorkspaceName}
+                  onChange={e => setNewWorkspaceName(e.target.value)}
+                  placeholder="My Company"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bot Token
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSlackSecrets ? 'text' : 'password'}
+                    value={newBotToken}
+                    onChange={e => setNewBotToken(e.target.value)}
+                    placeholder="xoxb-..."
+                    className="w-full px-4 py-2 pr-12 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Signing Secret
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSlackSecrets ? 'text' : 'password'}
+                    value={newSigningSecret}
+                    onChange={e => setNewSigningSecret(e.target.value)}
+                    placeholder="xxxxxxxx..."
+                    className="w-full px-4 py-2 pr-12 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={() => setShowSlackSecrets(true)}
+                    onMouseUp={() => setShowSlackSecrets(false)}
+                    onMouseLeave={() => setShowSlackSecrets(false)}
+                    onTouchStart={() => setShowSlackSecrets(true)}
+                    onTouchEnd={() => setShowSlackSecrets(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    title="押している間表示"
+                  >
+                    {showSlackSecrets ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                        <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={addSlackWorkspace}
+              disabled={saving}
+              className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 disabled:opacity-50"
+            >
+              {saving ? '追加中...' : 'ワークスペースを追加'}
+            </button>
+          </div>
+
+          {/* 登録済みワークスペース */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">登録済みワークスペース</h2>
+
+            {slackWorkspaces.length === 0 ? (
+              <p className="text-gray-500">
+                ワークスペースがありません。上のフォームからワークスペースを追加してください。
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {slackWorkspaces.map(workspace => (
+                  <div
+                    key={workspace.workspace_id}
+                    className="border rounded-lg p-4"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={workspace.is_active}
+                          onChange={e => toggleSlackWorkspace(workspace.workspace_id, e.target.checked)}
+                          className="w-5 h-5 text-pink-600 rounded focus:ring-pink-500"
+                        />
+                        <div>
+                          <span className="font-medium text-gray-900">{workspace.workspace_name}</span>
+                          <span className="text-xs text-gray-400 ml-2">({workspace.workspace_id})</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">
+                          {workspace.active_channel_count}/{workspace.channel_count} チャンネル
+                        </span>
+                        <button
+                          onClick={() => {
+                            if (selectedWorkspace === workspace.workspace_id) {
+                              setSelectedWorkspace(null)
+                              setSlackChannels([])
+                            } else {
+                              setSelectedWorkspace(workspace.workspace_id)
+                              fetchSlackChannels(workspace.workspace_id)
+                            }
+                          }}
+                          className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                        >
+                          {selectedWorkspace === workspace.workspace_id ? '閉じる' : 'チャンネル管理'}
+                        </button>
+                        <button
+                          onClick={() => deleteSlackWorkspace(workspace.workspace_id)}
+                          className="px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* チャンネル管理パネル */}
+                    {selectedWorkspace === workspace.workspace_id && (
+                      <div className="mt-4 pt-4 border-t">
+                        <h3 className="text-sm font-medium text-gray-700 mb-3">チャンネルを追加</h3>
+                        <div className="flex gap-2 mb-4">
+                          <input
+                            type="text"
+                            value={newSlackChannelId}
+                            onChange={e => setNewSlackChannelId(e.target.value)}
+                            placeholder="チャンネルID（C01234ABCDE）"
+                            className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm"
+                          />
+                          <input
+                            type="text"
+                            value={newSlackChannelName}
+                            onChange={e => setNewSlackChannelName(e.target.value)}
+                            placeholder="チャンネル名"
+                            className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm"
+                          />
+                          <button
+                            onClick={addSlackChannel}
+                            className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm"
+                          >
+                            追加
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-4">
+                          チャンネルIDはSlackでチャンネル名を右クリック → 「リンクをコピー」で確認できます
+                        </p>
+
+                        {slackChannels.length === 0 ? (
+                          <p className="text-sm text-gray-500">チャンネルがありません</p>
+                        ) : (
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {slackChannels.map(channel => (
+                              <div
+                                key={channel.room_id}
+                                className="flex items-center gap-3 p-2 rounded hover:bg-gray-50"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={channel.is_active}
+                                  onChange={e => toggleSlackChannel(channel.room_id, e.target.checked)}
+                                  className="w-4 h-4 text-pink-600 rounded focus:ring-pink-500"
+                                />
+                                <span className="flex-1 text-sm text-gray-900">{channel.room_name}</span>
+                                <span className="text-xs text-gray-400">{channel.room_id}</span>
+                                <button
+                                  onClick={() => deleteSlackChannel(channel.room_id)}
+                                  className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                                >
+                                  削除
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

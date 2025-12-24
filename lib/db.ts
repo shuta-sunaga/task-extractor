@@ -1,6 +1,17 @@
 import { sql } from '@vercel/postgres'
 
-export type Source = 'chatwork' | 'teams' | 'lark'
+export type Source = 'chatwork' | 'teams' | 'lark' | 'slack'
+
+export type SlackWorkspace = {
+  id: number
+  workspace_id: string
+  workspace_name: string
+  bot_token: string
+  signing_secret: string
+  bot_user_id: string | null
+  is_active: boolean
+  created_at: string
+}
 
 // テーブル作成（初回のみ）+ マイグレーション
 export async function initDatabase() {
@@ -116,6 +127,26 @@ export async function initDatabase() {
   await sql`
     ALTER TABLE tasks
     ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'chatwork'
+  `
+
+  // workspace_id カラム追加（Slack用）
+  await sql`
+    ALTER TABLE rooms
+    ADD COLUMN IF NOT EXISTS workspace_id TEXT
+  `
+
+  // Slack Workspaces テーブル
+  await sql`
+    CREATE TABLE IF NOT EXISTS slack_workspaces (
+      id SERIAL PRIMARY KEY,
+      workspace_id TEXT UNIQUE NOT NULL,
+      workspace_name TEXT NOT NULL,
+      bot_token TEXT NOT NULL,
+      signing_secret TEXT NOT NULL,
+      bot_user_id TEXT,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
   `
 }
 
@@ -390,4 +421,103 @@ export async function updateTaskStatus(id: number, status: string) {
 
 export async function deleteTask(id: number) {
   await sql`DELETE FROM tasks WHERE id = ${id}`
+}
+
+// Slack Workspaces
+export async function getSlackWorkspaces(): Promise<SlackWorkspace[]> {
+  const result = await sql`
+    SELECT * FROM slack_workspaces ORDER BY workspace_name
+  `
+  return result.rows as SlackWorkspace[]
+}
+
+export async function getSlackWorkspace(workspaceId: string): Promise<SlackWorkspace | null> {
+  const result = await sql`
+    SELECT * FROM slack_workspaces WHERE workspace_id = ${workspaceId} LIMIT 1
+  `
+  return (result.rows[0] as SlackWorkspace) || null
+}
+
+export async function getActiveSlackWorkspaces(): Promise<SlackWorkspace[]> {
+  const result = await sql`
+    SELECT * FROM slack_workspaces WHERE is_active = true ORDER BY workspace_name
+  `
+  return result.rows as SlackWorkspace[]
+}
+
+export async function createSlackWorkspace(workspace: {
+  workspaceId: string
+  workspaceName: string
+  botToken: string
+  signingSecret: string
+  botUserId?: string
+}): Promise<SlackWorkspace> {
+  const result = await sql`
+    INSERT INTO slack_workspaces (workspace_id, workspace_name, bot_token, signing_secret, bot_user_id)
+    VALUES (${workspace.workspaceId}, ${workspace.workspaceName}, ${workspace.botToken}, ${workspace.signingSecret}, ${workspace.botUserId || null})
+    ON CONFLICT (workspace_id) DO UPDATE SET
+      workspace_name = ${workspace.workspaceName},
+      bot_token = ${workspace.botToken},
+      signing_secret = ${workspace.signingSecret},
+      bot_user_id = COALESCE(${workspace.botUserId || null}, slack_workspaces.bot_user_id)
+    RETURNING *
+  `
+  return result.rows[0] as SlackWorkspace
+}
+
+export async function updateSlackWorkspace(workspaceId: string, updates: {
+  workspaceName?: string
+  botToken?: string
+  signingSecret?: string
+  botUserId?: string
+  isActive?: boolean
+}) {
+  await sql`
+    UPDATE slack_workspaces
+    SET workspace_name = COALESCE(${updates.workspaceName || null}, workspace_name),
+        bot_token = COALESCE(${updates.botToken || null}, bot_token),
+        signing_secret = COALESCE(${updates.signingSecret || null}, signing_secret),
+        bot_user_id = COALESCE(${updates.botUserId || null}, bot_user_id),
+        is_active = COALESCE(${updates.isActive ?? null}, is_active)
+    WHERE workspace_id = ${workspaceId}
+  `
+}
+
+export async function deleteSlackWorkspace(workspaceId: string) {
+  // まず関連するroomsを削除
+  await sql`
+    DELETE FROM rooms WHERE source = 'slack' AND workspace_id = ${workspaceId}
+  `
+  // ワークスペースを削除
+  await sql`
+    DELETE FROM slack_workspaces WHERE workspace_id = ${workspaceId}
+  `
+}
+
+// Slack用のルーム取得（ワークスペース指定）
+export async function getRoomsByWorkspace(workspaceId: string): Promise<{ id: number; room_id: string; room_name: string; is_active: boolean; workspace_id: string }[]> {
+  const result = await sql`
+    SELECT * FROM rooms
+    WHERE source = 'slack' AND workspace_id = ${workspaceId}
+    ORDER BY room_name
+  `
+  return result.rows as { id: number; room_id: string; room_name: string; is_active: boolean; workspace_id: string }[]
+}
+
+export async function getActiveRoomsByWorkspace(workspaceId: string) {
+  const result = await sql`
+    SELECT * FROM rooms
+    WHERE source = 'slack' AND workspace_id = ${workspaceId} AND is_active = true
+  `
+  return result.rows
+}
+
+export async function createSlackRoom(roomId: string, roomName: string, workspaceId: string) {
+  const result = await sql`
+    INSERT INTO rooms (room_id, room_name, source, workspace_id, is_active)
+    VALUES (${roomId}, ${roomName}, 'slack', ${workspaceId}, true)
+    ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}, workspace_id = ${workspaceId}
+    RETURNING *
+  `
+  return result.rows[0]
 }

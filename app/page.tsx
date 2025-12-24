@@ -11,7 +11,7 @@ type Task = {
   sender_name: string
   status: 'pending' | 'in_progress' | 'completed'
   priority: 'high' | 'medium' | 'low'
-  source: 'chatwork' | 'teams' | 'lark'
+  source: 'chatwork' | 'teams' | 'lark' | 'slack'
   created_at: string
 }
 
@@ -19,12 +19,14 @@ const sourceColors = {
   chatwork: 'bg-green-100 text-green-700',
   teams: 'bg-purple-100 text-purple-700',
   lark: 'bg-blue-100 text-blue-700',
+  slack: 'bg-pink-100 text-pink-700',
 }
 
 const sourceLabels = {
   chatwork: 'CW',
   teams: 'Teams',
   lark: 'Lark',
+  slack: 'Slack',
 }
 
 const statusLabels = {
