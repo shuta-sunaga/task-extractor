@@ -351,7 +351,7 @@
   - 一般ユーザー: `/[slug]/` のみ
 - **403エラー**: 各ページでインライン表示（「無効なURLです」）
 - **デプロイ後**: `/api/init` を呼び出してデータ移行実行
-- 株式会社Sei San Seiのslugは `seisansei`
+- 株式会社Sei San Seiのslugは `sei-san-sei`
 
 ---
 

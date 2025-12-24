@@ -51,7 +51,7 @@ export async function GET() {
 
     // 既存データを株式会社Sei San Seiに紐づけ
     let dataMigrated = false
-    const seiSanSei = await getCompanyBySlug('seisansei')
+    const seiSanSei = await getCompanyBySlug('sei-san-sei')
     if (seiSanSei) {
       await migrateDataToCompany(seiSanSei.id)
       dataMigrated = true
