@@ -67,6 +67,11 @@ export default function Dashboard() {
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [accessDenied, setAccessDenied] = useState(false)
 
+  // 一括削除モーダル用
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
   useEffect(() => {
     if (sessionStatus === 'loading') return
 
@@ -134,6 +139,32 @@ export default function Dashboard() {
     }
   }
 
+  // 完了タスクの件数
+  const completedCount = tasks.filter(task => task.status === 'completed').length
+
+  // 完了タスク一括削除
+  async function deleteCompletedTasks() {
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/tasks/completed', { method: 'DELETE' })
+      if (res.ok) {
+        const data = await res.json()
+        setTasks(tasks.filter(task => task.status !== 'completed'))
+        setShowDeleteModal(false)
+        setDeleteConfirmText('')
+        alert(`${data.deletedCount}件の完了タスクを削除しました`)
+      } else {
+        const error = await res.json()
+        alert(error.error || '削除に失敗しました')
+      }
+    } catch (error) {
+      console.error('Failed to delete completed tasks:', error)
+      alert('削除中にエラーが発生しました')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const filteredTasks = tasks.filter(task => {
     const statusMatch = statusFilter === 'all' || task.status === statusFilter
     const sourceMatch = sourceFilter === 'all' || task.source === sourceFilter
@@ -180,9 +211,23 @@ export default function Dashboard() {
             更新
           </button>
         </div>
-        <span className="text-sm text-gray-500">
-          {filteredTasks.length} 件
-        </span>
+        <div className="flex items-center gap-3">
+          {/* 管理者のみ: 完了タスク一括削除ボタン */}
+          {session?.user?.userType === 'admin' && completedCount > 0 && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors border border-red-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              完了タスクを一括削除 ({completedCount}件)
+            </button>
+          )}
+          <span className="text-sm text-gray-500">
+            {filteredTasks.length} 件
+          </span>
+        </div>
       </div>
 
       {/* フィルター */}
@@ -345,6 +390,60 @@ export default function Dashboard() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 完了タスク一括削除確認モーダル */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">完了タスクの一括削除</h3>
+                <p className="text-sm text-gray-500">この操作は取り消せません</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700 mb-4">
+                <span className="font-bold text-red-600">{completedCount}件</span>の完了タスクを削除しようとしています。
+                削除を実行するには、下のテキストボックスに「<span className="font-bold">削除します</span>」と入力してください。
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="削除します"
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setDeleteConfirmText('')
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={deleting}
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={deleteCompletedTasks}
+                disabled={deleteConfirmText !== '削除します' || deleting}
+                className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? '削除中...' : '削除を実行'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

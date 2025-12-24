@@ -657,6 +657,15 @@ export async function deleteTask(id: number) {
   await sql`DELETE FROM tasks WHERE id = ${id}`
 }
 
+export async function deleteCompletedTasks(companyId: number): Promise<number> {
+  const result = await sql`
+    DELETE FROM tasks
+    WHERE status = 'completed' AND company_id = ${companyId}
+    RETURNING id
+  `
+  return result.rowCount ?? 0
+}
+
 // Slack Workspaces
 export async function getSlackWorkspaces(companyId?: number): Promise<SlackWorkspace[]> {
   if (companyId !== undefined) {
