@@ -63,7 +63,7 @@ export default function Dashboard() {
 
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('pending')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [accessDenied, setAccessDenied] = useState(false)
 
@@ -237,7 +237,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 font-medium">ステータス</span>
             <div className="flex rounded-lg border overflow-hidden">
-              {['all', 'pending', 'in_progress', 'completed'].map(status => (
+              {['pending', 'in_progress', 'completed', 'all'].map(status => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
