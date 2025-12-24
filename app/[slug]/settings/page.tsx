@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter, useParams } from 'next/navigation'
 
 type Room = {
   id: number
@@ -42,7 +44,13 @@ type Settings = {
 type Tab = 'general' | 'chatwork' | 'teams' | 'lark' | 'slack'
 
 export default function SettingsPage() {
+  const { data: session, status: sessionStatus } = useSession()
+  const router = useRouter()
+  const params = useParams()
+  const slug = params.slug as string
+
   const [activeTab, setActiveTab] = useState<Tab>('general')
+  const [accessDenied, setAccessDenied] = useState(false)
   const [settings, setSettings] = useState<Settings>({
     chatwork_api_token: '',
     webhook_token: '',
@@ -106,8 +114,34 @@ export default function SettingsPage() {
   const [showResendKey, setShowResendKey] = useState(false)
 
   useEffect(() => {
+    if (sessionStatus === 'loading') return
+
+    if (sessionStatus === 'unauthenticated') {
+      router.push('/login')
+      return
+    }
+
+    // システム管理者はこのページにアクセスできない
+    if (session?.user?.userType === 'system_admin') {
+      router.push('/system-admin')
+      return
+    }
+
+    // 管理者のみアクセス可能
+    if (session?.user?.userType !== 'admin') {
+      router.push(`/${slug}`)
+      return
+    }
+
+    // 自社のslugと一致するか確認
+    if (session?.user?.companySlug !== slug) {
+      setAccessDenied(true)
+      setLoading(false)
+      return
+    }
+
     fetchData()
-  }, [])
+  }, [session, sessionStatus, slug, router])
 
   async function fetchData() {
     try {
@@ -625,7 +659,17 @@ export default function SettingsPage() {
     ? `${window.location.origin}/api/webhook/slack`
     : ''
 
-  if (loading) {
+  if (accessDenied) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="text-6xl mb-4">403</div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">アクセス拒否</h1>
+        <p className="text-gray-500">無効なURLです。このページにアクセスする権限がありません。</p>
+      </div>
+    )
+  }
+
+  if (loading || sessionStatus === 'loading') {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-gray-500">読み込み中...</div>

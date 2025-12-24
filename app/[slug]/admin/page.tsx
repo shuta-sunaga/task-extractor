@@ -2,21 +2,52 @@
 
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const params = useParams()
+  const slug = params.slug as string
+  const [accessDenied, setAccessDenied] = useState(false)
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      const userType = session?.user?.userType
-      if (userType !== 'admin') {
-        router.push('/')
-      }
+    if (status === 'loading') return
+
+    if (status === 'unauthenticated') {
+      router.push('/login')
+      return
     }
-  }, [session, status, router])
+
+    // システム管理者はこのページにアクセスできない
+    if (session?.user?.userType === 'system_admin') {
+      router.push('/system-admin')
+      return
+    }
+
+    // 管理者のみアクセス可能
+    if (session?.user?.userType !== 'admin') {
+      router.push(`/${slug}`)
+      return
+    }
+
+    // 自社のslugと一致するか確認
+    if (session?.user?.companySlug !== slug) {
+      setAccessDenied(true)
+      return
+    }
+  }, [session, status, slug, router])
+
+  if (accessDenied) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="text-6xl mb-4">403</div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">アクセス拒否</h1>
+        <p className="text-gray-500">無効なURLです。このページにアクセスする権限がありません。</p>
+      </div>
+    )
+  }
 
   if (status === 'loading') {
     return (
@@ -33,7 +64,7 @@ export default function AdminPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* ユーザー管理 */}
         <Link
-          href="/admin/users"
+          href={`/${slug}/admin/users`}
           className="block p-6 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
         >
           <div className="flex items-center gap-4">
@@ -51,7 +82,7 @@ export default function AdminPage() {
 
         {/* ロール管理 */}
         <Link
-          href="/admin/roles"
+          href={`/${slug}/admin/roles`}
           className="block p-6 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
         >
           <div className="flex items-center gap-4">

@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { getTasks, createTask } from '@/lib/db'
 
 export async function GET() {
   try {
-    const tasks = await getTasks()
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // 企業ユーザーは自社のタスクのみ取得
+    const companyId = session.user.companyId
+    const tasks = await getTasks(companyId ?? undefined)
     return NextResponse.json(tasks)
   } catch (error) {
     console.error('Get tasks error:', error)

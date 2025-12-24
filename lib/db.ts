@@ -298,7 +298,11 @@ export async function initDatabase() {
 }
 
 // Settings
-export async function getSettings() {
+export async function getSettings(companyId?: number) {
+  if (companyId) {
+    const result = await sql`SELECT * FROM settings WHERE company_id = ${companyId} LIMIT 1`
+    return result.rows[0] || null
+  }
   const result = await sql`SELECT * FROM settings LIMIT 1`
   return result.rows[0] || null
 }
@@ -442,7 +446,11 @@ export async function saveNotificationSettings(notificationSettings: Omit<Notifi
 }
 
 // Rooms
-export async function getRooms() {
+export async function getRooms(companyId?: number) {
+  if (companyId) {
+    const result = await sql`SELECT * FROM rooms WHERE company_id = ${companyId} ORDER BY source, room_name`
+    return result.rows
+  }
   const result = await sql`SELECT * FROM rooms ORDER BY source, room_name`
   return result.rows
 }
@@ -507,7 +515,26 @@ export async function deleteRoom(roomId: string, source: Source) {
 }
 
 // Tasks
-export async function getTasks() {
+export async function getTasks(companyId?: number) {
+  if (companyId) {
+    const result = await sql`
+      SELECT * FROM tasks
+      WHERE company_id = ${companyId}
+      ORDER BY
+        CASE status
+          WHEN 'pending' THEN 1
+          WHEN 'in_progress' THEN 2
+          WHEN 'completed' THEN 3
+        END,
+        CASE priority
+          WHEN 'high' THEN 1
+          WHEN 'medium' THEN 2
+          WHEN 'low' THEN 3
+        END,
+        created_at DESC
+    `
+    return result.rows
+  }
   const result = await sql`
     SELECT * FROM tasks
     ORDER BY

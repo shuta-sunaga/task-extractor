@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
 type User = {
@@ -19,11 +19,14 @@ type User = {
 export default function UsersPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const params = useParams()
+  const slug = params.slug as string
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [message, setMessage] = useState('')
+  const [accessDenied, setAccessDenied] = useState(false)
 
   // フォーム状態
   const [formData, setFormData] = useState({
@@ -34,15 +37,34 @@ export default function UsersPage() {
   })
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      const userType = session?.user?.userType
-      if (userType !== 'admin') {
-        router.push('/')
-      } else {
-        fetchUsers()
-      }
+    if (status === 'loading') return
+
+    if (status === 'unauthenticated') {
+      router.push('/login')
+      return
     }
-  }, [session, status, router])
+
+    // システム管理者はこのページにアクセスできない
+    if (session?.user?.userType === 'system_admin') {
+      router.push('/system-admin')
+      return
+    }
+
+    // 管理者のみアクセス可能
+    if (session?.user?.userType !== 'admin') {
+      router.push(`/${slug}`)
+      return
+    }
+
+    // 自社のslugと一致するか確認
+    if (session?.user?.companySlug !== slug) {
+      setAccessDenied(true)
+      setLoading(false)
+      return
+    }
+
+    fetchUsers()
+  }, [session, status, slug, router])
 
   async function fetchUsers() {
     try {
@@ -161,6 +183,16 @@ export default function UsersPage() {
     }
   }
 
+  if (accessDenied) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="text-6xl mb-4">403</div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">アクセス拒否</h1>
+        <p className="text-gray-500">無効なURLです。このページにアクセスする権限がありません。</p>
+      </div>
+    )
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -173,7 +205,7 @@ export default function UsersPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-          <Link href="/admin" className="text-gray-500 hover:text-gray-700">
+          <Link href={`/${slug}/admin`} className="text-gray-500 hover:text-gray-700">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>

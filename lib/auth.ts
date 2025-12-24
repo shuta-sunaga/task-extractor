@@ -1,7 +1,7 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { verifyPassword } from '@/lib/password'
-import { getUserByEmail, updateLastLogin } from '@/lib/db'
+import { getUserByEmail, updateLastLogin, getCompanyById } from '@/lib/db'
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -28,11 +28,19 @@ export const authOptions: NextAuthOptions = {
 
         await updateLastLogin(user.id)
 
+        // 企業のslugを取得
+        let companySlug: string | null = null
+        if (user.company_id) {
+          const company = await getCompanyById(user.company_id)
+          companySlug = company?.slug || null
+        }
+
         return {
           id: String(user.id),
           email: user.email,
           name: user.name,
           companyId: user.company_id,
+          companySlug,
           userType: user.user_type,
         }
       },
@@ -43,6 +51,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.companyId = user.companyId
+        token.companySlug = user.companySlug
         token.userType = user.userType
       }
       return token
@@ -51,6 +60,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id
         session.user.companyId = token.companyId
+        session.user.companySlug = token.companySlug
         session.user.userType = token.userType
       }
       return session

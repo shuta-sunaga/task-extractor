@@ -14,14 +14,22 @@ export function Header() {
   }
 
   const isSystemAdmin = session?.user?.userType === 'system_admin'
-  const isAdmin = session?.user?.userType === 'admin' || isSystemAdmin
+  const isAdmin = session?.user?.userType === 'admin'
+  const companySlug = session?.user?.companySlug
+
+  // ホームリンク先を決定
+  const homeHref = isSystemAdmin
+    ? '/system-admin'
+    : companySlug
+      ? `/${companySlug}`
+      : '/'
 
   return (
     <header className="bg-gradient-to-r from-teal-500 to-cyan-500 shadow-md">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center">
           <Link
-            href="/"
+            href={homeHref}
             className="text-2xl font-bold text-white drop-shadow hover:opacity-90 transition-opacity"
             style={{ fontFamily: '"Zen Maru Gothic", sans-serif' }}
           >
@@ -30,28 +38,7 @@ export function Header() {
           <nav className="flex items-center gap-4">
             {status === 'authenticated' && (
               <>
-                <Link
-                  href="/"
-                  className={`text-white/90 hover:text-white font-medium transition-colors ${pathname === '/' ? 'text-white underline underline-offset-4' : ''}`}
-                >
-                  ダッシュボード
-                </Link>
-                {isAdmin && (
-                  <Link
-                    href="/settings"
-                    className={`text-white/90 hover:text-white font-medium transition-colors ${pathname === '/settings' ? 'text-white underline underline-offset-4' : ''}`}
-                  >
-                    設定
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className={`text-white/90 hover:text-white font-medium transition-colors ${pathname.startsWith('/admin') ? 'text-white underline underline-offset-4' : ''}`}
-                  >
-                    管理
-                  </Link>
-                )}
+                {/* システム管理者用メニュー */}
                 {isSystemAdmin && (
                   <Link
                     href="/system-admin"
@@ -60,13 +47,42 @@ export function Header() {
                     企業管理
                   </Link>
                 )}
+
+                {/* 企業ユーザー用メニュー */}
+                {!isSystemAdmin && companySlug && (
+                  <>
+                    <Link
+                      href={`/${companySlug}`}
+                      className={`text-white/90 hover:text-white font-medium transition-colors ${pathname === `/${companySlug}` ? 'text-white underline underline-offset-4' : ''}`}
+                    >
+                      ダッシュボード
+                    </Link>
+                    {isAdmin && (
+                      <>
+                        <Link
+                          href={`/${companySlug}/settings`}
+                          className={`text-white/90 hover:text-white font-medium transition-colors ${pathname === `/${companySlug}/settings` ? 'text-white underline underline-offset-4' : ''}`}
+                        >
+                          設定
+                        </Link>
+                        <Link
+                          href={`/${companySlug}/admin`}
+                          className={`text-white/90 hover:text-white font-medium transition-colors ${pathname.startsWith(`/${companySlug}/admin`) ? 'text-white underline underline-offset-4' : ''}`}
+                        >
+                          管理
+                        </Link>
+                      </>
+                    )}
+                  </>
+                )}
+
                 <div className="flex items-center gap-3 ml-4 pl-4 border-l border-white/30">
                   <span className="text-white/80 text-sm">
                     {session.user.name}
                     {isSystemAdmin && (
                       <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">SYS</span>
                     )}
-                    {!isSystemAdmin && isAdmin && (
+                    {isAdmin && (
                       <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">管理者</span>
                     )}
                   </span>

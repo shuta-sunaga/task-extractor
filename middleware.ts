@@ -9,14 +9,39 @@ export default withAuth(
     // システム管理者専用ページのチェック
     if (pathname.startsWith('/system-admin')) {
       if (token?.userType !== 'system_admin') {
-        return NextResponse.redirect(new URL('/', req.url))
+        return NextResponse.redirect(new URL('/login', req.url))
       }
     }
 
-    // 管理者専用ページのチェック（企業の管理者のみ）
-    if (pathname.startsWith('/admin')) {
-      if (token?.userType !== 'admin') {
-        return NextResponse.redirect(new URL('/', req.url))
+    // システム管理者は企業ページにアクセスできない
+    // /login, /api, /system-admin 以外のパスはすべて企業ページと見なす
+    const isCompanyPage = !pathname.startsWith('/login') &&
+                          !pathname.startsWith('/api') &&
+                          !pathname.startsWith('/system-admin') &&
+                          pathname !== '/'
+
+    if (isCompanyPage && token?.userType === 'system_admin') {
+      return NextResponse.redirect(new URL('/system-admin', req.url))
+    }
+
+    // 企業ユーザーの場合、自社のslugと一致するかチェック
+    // パスの最初のセグメントがslug
+    if (isCompanyPage && token?.userType !== 'system_admin') {
+      const pathSegments = pathname.split('/').filter(Boolean)
+      const urlSlug = pathSegments[0]
+      const userSlug = token?.companySlug
+
+      // slugが一致しない場合は自社ページにリダイレクト
+      if (urlSlug && userSlug && urlSlug !== userSlug) {
+        return NextResponse.redirect(new URL(`/${userSlug}`, req.url))
+      }
+
+      // 管理者専用ページのチェック（/[slug]/admin, /[slug]/settings）
+      if (pathSegments.length >= 2) {
+        const subPath = pathSegments[1]
+        if ((subPath === 'admin' || subPath === 'settings') && token?.userType !== 'admin') {
+          return NextResponse.redirect(new URL(`/${userSlug}`, req.url))
+        }
       }
     }
 
