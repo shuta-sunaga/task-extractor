@@ -174,7 +174,7 @@ export default function Dashboard() {
 
           {/* ソースフィルター */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 font-medium">連携</span>
+            <span className="text-xs text-gray-500 font-medium">ツール</span>
             <div className="flex gap-1">
               <button
                 onClick={() => setSourceFilter('all')}
