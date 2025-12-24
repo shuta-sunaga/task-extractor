@@ -148,7 +148,7 @@ export default function Dashboard() {
       </div>
 
       {/* フィルター */}
-      <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+      <div className="bg-gray-50 rounded-lg p-3 mb-4">
         <div className="flex flex-wrap items-center gap-4">
           {/* ステータスフィルター */}
           <div className="flex items-center gap-2">
