@@ -12,7 +12,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (status === 'authenticated') {
       const userType = session?.user?.userType
-      if (userType !== 'system_admin' && userType !== 'admin') {
+      if (userType !== 'admin') {
         router.push('/')
       }
     }

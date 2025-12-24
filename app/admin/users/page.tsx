@@ -10,7 +10,7 @@ type User = {
   company_id: number | null
   email: string
   name: string
-  user_type: 'system_admin' | 'admin' | 'user'
+  user_type: 'admin' | 'user'
   is_active: boolean
   last_login_at: string | null
   created_at: string
@@ -33,12 +33,10 @@ export default function UsersPage() {
     userType: 'user' as 'admin' | 'user',
   })
 
-  const isSystemAdmin = session?.user?.userType === 'system_admin'
-
   useEffect(() => {
     if (status === 'authenticated') {
       const userType = session?.user?.userType
-      if (userType !== 'system_admin' && userType !== 'admin') {
+      if (userType !== 'admin') {
         router.push('/')
       } else {
         fetchUsers()
@@ -141,7 +139,7 @@ export default function UsersPage() {
       email: user.email,
       password: '',
       name: user.name,
-      userType: user.user_type === 'system_admin' ? 'admin' : user.user_type,
+      userType: user.user_type,
     })
     setMessage('')
     setShowModal(true)
@@ -149,7 +147,6 @@ export default function UsersPage() {
 
   const userTypeLabel = (type: string) => {
     switch (type) {
-      case 'system_admin': return 'システム管理者'
       case 'admin': return '管理者'
       case 'user': return '一般ユーザー'
       default: return type
@@ -158,7 +155,6 @@ export default function UsersPage() {
 
   const userTypeBadge = (type: string) => {
     switch (type) {
-      case 'system_admin': return 'bg-red-100 text-red-700'
       case 'admin': return 'bg-purple-100 text-purple-700'
       case 'user': return 'bg-gray-100 text-gray-700'
       default: return 'bg-gray-100 text-gray-700'
@@ -223,10 +219,9 @@ export default function UsersPage() {
                 <td className="px-6 py-4">
                   <button
                     onClick={() => toggleActive(user)}
-                    disabled={user.user_type === 'system_admin' && !isSystemAdmin}
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 ${
                       user.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    } ${user.user_type === 'system_admin' && !isSystemAdmin ? 'cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}`}
+                    }`}
                   >
                     {user.is_active ? '有効' : '無効'}
                   </button>
@@ -240,8 +235,7 @@ export default function UsersPage() {
                   <div className="flex justify-end gap-2">
                     <button
                       onClick={() => openEditModal(user)}
-                      disabled={user.user_type === 'system_admin' && !isSystemAdmin}
-                      className="text-gray-500 hover:text-teal-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="text-gray-500 hover:text-teal-600"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -249,7 +243,7 @@ export default function UsersPage() {
                     </button>
                     <button
                       onClick={() => handleDelete(user)}
-                      disabled={user.id === parseInt(session?.user?.id || '0') || (user.user_type === 'system_admin' && !isSystemAdmin)}
+                      disabled={user.id === parseInt(session?.user?.id || '0')}
                       className="text-gray-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

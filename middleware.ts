@@ -13,9 +13,9 @@ export default withAuth(
       }
     }
 
-    // 管理者専用ページのチェック
+    // 管理者専用ページのチェック（企業の管理者のみ）
     if (pathname.startsWith('/admin')) {
-      if (token?.userType !== 'system_admin' && token?.userType !== 'admin') {
+      if (token?.userType !== 'admin') {
         return NextResponse.redirect(new URL('/', req.url))
       }
     }

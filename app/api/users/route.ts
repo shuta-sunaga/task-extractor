@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUsers, createUser, UserType } from '@/lib/db'
+import { getUsers, createUser, UserType, getCompanies } from '@/lib/db'
 import { hashPassword, validatePasswordStrength } from '@/lib/password'
 import { requireAdmin, isSystemAdmin } from '@/lib/session'
 
@@ -15,10 +15,15 @@ export async function GET() {
     const companyId = isSystemAdmin(user) ? undefined : user.companyId ?? undefined
     const users = await getUsers(companyId)
 
-    // パスワードハッシュを除外
+    // 企業一覧を取得してマッピング用に使用
+    const companies = await getCompanies()
+    const companyMap = new Map(companies.map(c => [c.id, c.name]))
+
+    // パスワードハッシュを除外、企業名を追加
     const safeUsers = users.map(u => ({
       id: u.id,
       company_id: u.company_id,
+      company_name: u.company_id ? companyMap.get(u.company_id) || null : null,
       email: u.email,
       name: u.name,
       user_type: u.user_type,

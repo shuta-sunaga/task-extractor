@@ -47,32 +47,14 @@ export default function SystemAdminPage() {
             </div>
           </div>
         </Link>
-
-        {/* 全ユーザー管理 */}
-        <Link
-          href="/admin/users"
-          className="block p-6 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-teal-100 rounded-lg">
-              <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">全ユーザー管理</h2>
-              <p className="text-sm text-gray-500">全企業のユーザー管理</p>
-            </div>
-          </div>
-        </Link>
       </div>
 
       {/* 情報カード */}
       <div className="mt-8 p-6 bg-red-50 rounded-xl border border-red-200">
         <h3 className="font-semibold text-red-900 mb-2">システム管理者向け情報</h3>
         <ul className="text-sm text-red-700 space-y-1">
-          <li>・企業を作成し、各企業に管理者ユーザーを割り当てることができます</li>
-          <li>・システム管理者は全企業のデータを横断して管理できます</li>
+          <li>・クライアント企業を作成・管理できます</li>
+          <li>・各企業の管理者がユーザー・ロールを管理します</li>
           <li>・企業を削除する前に、所属するユーザーを全て削除する必要があります</li>
         </ul>
       </div>

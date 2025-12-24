@@ -9,7 +9,11 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:open.larkoffice.com)",
       "WebFetch(domain:api.slack.com)",
-      "WebFetch(domain:docs.slack.dev)"
+      "WebFetch(domain:docs.slack.dev)",
+      "Bash(npx miyabi agent --help:*)",
+      "Bash(npx miyabi:*)",
+      "Bash(npx vercel --version)",
+      "Bash(npx vercel:*)"
     ]
   }
 }
