@@ -3,6 +3,25 @@ import { sql } from '@vercel/postgres'
 import { initDatabase, createInitialSystemAdmin, getUserByEmail, getCompanyBySlug } from '@/lib/db'
 import { hashPassword } from '@/lib/password'
 
+// 既存企業にwebhook_tokenがない場合に生成
+async function generateWebhookTokensForExistingCompanies(): Promise<number> {
+  // webhook_tokenがNULLの企業を取得
+  const result = await sql`
+    SELECT id FROM companies WHERE webhook_token IS NULL
+  `
+
+  let count = 0
+  for (const row of result.rows) {
+    const token = crypto.randomUUID()
+    await sql`
+      UPDATE companies SET webhook_token = ${token} WHERE id = ${row.id}
+    `
+    count++
+  }
+
+  return count
+}
+
 // 既存データを指定企業に紐づけるマイグレーション
 async function migrateDataToCompany(companyId: number) {
   // settings を紐づけ
@@ -57,10 +76,14 @@ export async function GET() {
       dataMigrated = true
     }
 
+    // 既存企業にwebhook_tokenを付与
+    const webhookTokensGenerated = await generateWebhookTokensForExistingCompanies()
+
     return NextResponse.json({
       message: 'Database initialized successfully',
       adminCreated,
       dataMigrated,
+      webhookTokensGenerated,
       note: adminCreated
         ? `初期管理者を作成しました: ${adminEmail}`
         : '既存のデータベース構造を確認しました',

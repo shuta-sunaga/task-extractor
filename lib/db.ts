@@ -19,6 +19,7 @@ export type Company = {
   id: number
   name: string
   slug: string
+  webhook_token: string
   is_active: boolean
   created_at: string
 }
@@ -205,6 +206,12 @@ export async function initDatabase() {
       is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+  `
+
+  // webhook_token カラム追加（Webhook URL用のUUID）
+  await sql`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS webhook_token TEXT UNIQUE
   `
 
   // Users テーブル
@@ -781,12 +788,30 @@ export async function getCompanyBySlug(slug: string): Promise<Company | null> {
 }
 
 export async function createCompany(name: string, slug: string): Promise<Company> {
+  const webhookToken = crypto.randomUUID()
   const result = await sql`
-    INSERT INTO companies (name, slug)
-    VALUES (${name}, ${slug})
+    INSERT INTO companies (name, slug, webhook_token)
+    VALUES (${name}, ${slug}, ${webhookToken})
     RETURNING *
   `
   return result.rows[0] as Company
+}
+
+// 企業のwebhook_tokenを再生成
+export async function regenerateCompanyWebhookToken(companyId: number): Promise<string> {
+  const newToken = crypto.randomUUID()
+  await sql`
+    UPDATE companies SET webhook_token = ${newToken} WHERE id = ${companyId}
+  `
+  return newToken
+}
+
+// webhook_tokenから企業を取得
+export async function getCompanyByWebhookToken(token: string): Promise<Company | null> {
+  const result = await sql`
+    SELECT * FROM companies WHERE webhook_token = ${token} AND is_active = true LIMIT 1
+  `
+  return (result.rows[0] as Company) || null
 }
 
 export async function updateCompany(id: number, updates: { name?: string; slug?: string; is_active?: boolean }): Promise<Company | null> {

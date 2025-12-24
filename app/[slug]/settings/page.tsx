@@ -113,6 +113,9 @@ export default function SettingsPage() {
   const [resendApiKey, setResendApiKey] = useState('')
   const [showResendKey, setShowResendKey] = useState(false)
 
+  // 企業Webhook設定
+  const [companyWebhookToken, setCompanyWebhookToken] = useState<string | null>(null)
+
   useEffect(() => {
     if (sessionStatus === 'loading') return
 
@@ -145,13 +148,19 @@ export default function SettingsPage() {
 
   async function fetchData() {
     try {
-      const [settingsRes, chatworkRoomsRes, teamsRoomsRes, larkRoomsRes, slackWorkspacesRes] = await Promise.all([
+      const [settingsRes, chatworkRoomsRes, teamsRoomsRes, larkRoomsRes, slackWorkspacesRes, companyRes] = await Promise.all([
         fetch('/api/settings'),
         fetch('/api/rooms?source=chatwork'),
         fetch('/api/rooms?source=teams'),
         fetch('/api/rooms?source=lark'),
         fetch('/api/slack/workspaces'),
+        fetch('/api/companies/me'),
       ])
+
+      if (companyRes.ok) {
+        const companyData = await companyRes.json()
+        setCompanyWebhookToken(companyData.webhook_token || null)
+      }
 
       if (settingsRes.ok) {
         const data = await settingsRes.json()
@@ -643,18 +652,20 @@ export default function SettingsPage() {
     }
   }
 
-  const chatworkWebhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/webhook/chatwork`
+  // Webhook URLはトークンが取得できてから生成
+  const chatworkWebhookUrl = typeof window !== 'undefined' && companyWebhookToken
+    ? `${window.location.origin}/api/webhook/chatwork/${companyWebhookToken}`
     : ''
 
-  const teamsWebhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/webhook/teams`
+  const teamsWebhookUrl = typeof window !== 'undefined' && companyWebhookToken
+    ? `${window.location.origin}/api/webhook/teams/${companyWebhookToken}`
     : ''
 
-  const larkWebhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/webhook/lark`
+  const larkWebhookUrl = typeof window !== 'undefined' && companyWebhookToken
+    ? `${window.location.origin}/api/webhook/lark/${companyWebhookToken}`
     : ''
 
+  // Slackは既存の方式（ワークスペースIDで識別）のまま
   const slackWebhookUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/api/webhook/slack`
     : ''
