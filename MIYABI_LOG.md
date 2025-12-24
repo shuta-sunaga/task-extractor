@@ -387,6 +387,58 @@
 
 ---
 
+### セッション 12
+
+#### 指示
+- マルチテナント対応の修正（設定・タスク・Webhookが他企業で見える問題）
+- Webhook URLを企業ごとに分離（セキュリティ向上のためUUID使用）
+
+#### 実施内容
+1. **設定・ルーム・タスクAPIの企業IDフィルタリング修正**
+   - `lib/db.ts`: 各関数に`companyId`パラメータを追加
+     - `getSettings()`, `saveSettings()`, `saveTeamsSettings()`, `saveLarkSettings()`
+     - `getNotificationSettings()`, `saveNotificationSettings()`
+     - `getRoomsBySource()`, `getActiveRooms()`, `getActiveRoomsBySource()`
+     - `upsertRoom()`, `createRoom()`, `createTask()`
+   - `app/api/settings/route.ts`: セッションから`companyId`を渡す
+   - `app/api/rooms/route.ts`: セッションから`companyId`を渡す
+
+2. **Webhookエンドポイントの企業ID対応**
+   - `app/api/webhook/chatwork/route.ts`: settingsから`companyId`取得
+   - `app/api/webhook/teams/route.ts`: settingsから`companyId`取得
+   - `app/api/webhook/lark/route.ts`: settingsから`companyId`取得
+   - `app/api/webhook/slack/route.ts`: workspaceから`companyId`取得
+
+3. **Slack APIの企業IDフィルタリング**
+   - `lib/db.ts`: `getSlackWorkspaces()`, `createSlackWorkspace()`に`companyId`追加
+   - `app/api/slack/workspaces/route.ts`: 全メソッドで企業ID検証
+   - `app/api/slack/channels/route.ts`: 全メソッドで企業ID検証
+   - `lib/db.ts`: `getRoomByIdAndSource()`追加（チャンネル所有権確認用）
+
+4. **企業別Webhook URL（UUIDトークン）**
+   - `lib/db.ts`:
+     - `Company`型に`webhook_token`追加
+     - `createCompany()`: UUID自動生成
+     - `regenerateCompanyWebhookToken()`: トークン再生成
+     - `getCompanyByWebhookToken()`: トークンから企業取得
+   - `app/api/init/route.ts`: 既存企業へのトークン付与マイグレーション
+   - 新規Webhookルート作成:
+     - `app/api/webhook/chatwork/[token]/route.ts`
+     - `app/api/webhook/teams/[token]/route.ts`
+     - `app/api/webhook/lark/[token]/route.ts`
+   - `app/api/companies/me/route.ts`: 自社情報取得API
+   - `app/[slug]/settings/page.tsx`: トークン付きWebhook URL表示
+
+#### 備考
+- **Webhook URL変更**:
+  - 旧: `/api/webhook/chatwork`（全企業共通）
+  - 新: `/api/webhook/chatwork/{uuid}`（企業別）
+- Slackは既存方式（ワークスペースIDで識別）を維持
+- 既存ユーザーは`/api/init`実行後、設定画面で新しいWebhook URLを確認・設定し直しが必要
+- 旧URLは互換性のため残っているが、新規設定では使用しないこと
+
+---
+
 <!--
 使い方:
 - 新しいセッションごとに「### セッション N」を追加
