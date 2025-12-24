@@ -167,6 +167,45 @@
 
 ---
 
+## 2025-12-24
+
+### セッション 7
+
+#### 指示
+- Slackのエラー解析（チャンネルが監視対象にならない問題）
+- ボット追加時の自動チャンネル登録機能を実装
+- 全メッセンジャーの設定手順をドキュメント化
+- ダッシュボードのリアルタイム更新（SSE）→ Vercel制約により断念
+- ダッシュボードに更新ボタンを追加
+
+#### 実施内容
+1. **Slack自動チャンネル登録機能**
+   - `lib/slack.ts`: `member_joined_channel`イベント判定、`auth.test` API、`conversations.info` API追加
+   - `app/api/slack/workspaces/route.ts`: ワークスペース登録時に`bot_user_id`を自動取得
+   - `app/api/webhook/slack/route.ts`: ボット参加時にチャンネルを自動登録
+
+2. **設定ドキュメント作成** (`MESSENGER_SETUP.md`) - 新規
+   - Chatwork: APIトークン取得、Webhook設定
+   - Teams: Outgoing Webhook作成、セキュリティトークン
+   - Lark: アプリ作成、Event Subscriptions、権限設定
+   - Slack: アプリ作成、OAuth設定、自動登録の説明
+   - 共通設定（メール通知、環境変数）
+
+3. **SSE実装 → 削除**
+   - 実装したが、Vercelのサーバーレス環境ではインスタンス間でメモリ共有できないため断念
+   - 代替としてポーリングを提案したが、ユーザー希望により更新ボタン方式に
+
+4. **ダッシュボード更新ボタン** (`app/page.tsx`)
+   - タイトル横に控えめな更新ボタンを追加
+   - 読み込み中はアイコンが回転
+
+#### 備考
+- Slack自動登録には`member_joined_channel`イベントの購読が必要
+- 既存ワークスペースは`bot_user_id`がないため、再登録が必要
+- Vercelでリアルタイム更新が必要な場合はPusher/Ably等の外部サービスが必要
+
+---
+
 <!--
 使い方:
 - 新しいセッションごとに「### セッション N」を追加
