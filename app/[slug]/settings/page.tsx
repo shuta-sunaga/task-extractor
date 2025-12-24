@@ -639,19 +639,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function initDatabase() {
-    try {
-      const res = await fetch('/api/init')
-      if (res.ok) {
-        setMessage('データベースを初期化しました')
-      } else {
-        setMessage('初期化に失敗しました')
-      }
-    } catch (error) {
-      setMessage('エラーが発生しました')
-    }
-  }
-
   // Webhook URLはトークンが取得できてから生成
   const chatworkWebhookUrl = typeof window !== 'undefined' && companyWebhookToken
     ? `${window.location.origin}/api/webhook/chatwork/${companyWebhookToken}`
@@ -690,15 +677,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">設定</h1>
-        <button
-          onClick={initDatabase}
-          className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-        >
-          DB初期化
-        </button>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900">設定</h1>
 
       {message && (
         <div className={`p-4 rounded-lg ${
