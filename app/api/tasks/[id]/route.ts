@@ -33,12 +33,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     // ロール権限チェック
     const permission = await checkTaskPermission(user as SessionUser, task.room_id, task.source)
-    if (!permission.canEditStatus) {
-      return NextResponse.json({ error: 'Forbidden: No edit permission' }, { status: 403 })
-    }
 
-    // ステータス更新
+    // ステータス更新（権限チェック必要）
     if (body.status !== undefined) {
+      if (!permission.canEditStatus) {
+        return NextResponse.json({ error: 'Forbidden: No edit permission' }, { status: 403 })
+      }
       await updateTaskStatus(taskId, body.status)
 
       // 完了時のみ通知
@@ -56,8 +56,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       }
     }
 
-    // メモ更新
+    // メモ更新（閲覧権限があれば可能）
     if (body.memo !== undefined) {
+      if (!permission.canView) {
+        return NextResponse.json({ error: 'Forbidden: No view permission' }, { status: 403 })
+      }
       await updateTaskMemo(taskId, body.memo || null)
     }
 
