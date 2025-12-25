@@ -309,26 +309,26 @@ export default function UsersPage() {
 
       {/* ユーザー一覧 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-        <table className="w-full min-w-[900px]">
+        <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">名前</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">メール</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">種別</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">ロール</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">状態</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">最終ログイン</th>
-              <th className="text-right px-6 py-3 text-sm font-medium text-gray-500">操作</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">名前</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">メール</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">種別</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">ロール</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">状態</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">最終ログイン</th>
+              <th className="text-right px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {users.map(user => (
               <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 whitespace-nowrap">
                   <span className="font-medium text-gray-900">{user.name}</span>
                 </td>
-                <td className="px-6 py-4 text-gray-600">{user.email}</td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{user.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${userTypeBadge(user.user_type)}`}>
                     {userTypeLabel(user.user_type)}
                   </span>
@@ -364,7 +364,7 @@ export default function UsersPage() {
                     <span className="text-gray-400 text-xs">—</span>
                   )}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 whitespace-nowrap">
                   <button
                     onClick={() => toggleActive(user)}
                     className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 ${
@@ -374,12 +374,12 @@ export default function UsersPage() {
                     {user.is_active ? '有効' : '無効'}
                   </button>
                 </td>
-                <td className="px-6 py-4 text-gray-500 text-sm">
+                <td className="px-6 py-4 text-gray-500 text-sm whitespace-nowrap">
                   {user.last_login_at
                     ? new Date(user.last_login_at).toLocaleString('ja-JP')
                     : '未ログイン'}
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right whitespace-nowrap">
                   <div className="flex justify-end gap-2">
                     <button
                       onClick={() => openEditModal(user)}

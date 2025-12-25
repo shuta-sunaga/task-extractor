@@ -163,26 +163,26 @@ export default function CompaniesPage() {
 
       {/* 企業一覧 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-        <table className="w-full min-w-[700px]">
+        <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">企業名</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Slug</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">ユーザー数</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">状態</th>
-              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">作成日</th>
-              <th className="text-right px-6 py-3 text-sm font-medium text-gray-500">操作</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">企業名</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">Slug</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">ユーザー数</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">状態</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">作成日</th>
+              <th className="text-right px-6 py-3 text-sm font-medium text-gray-500 whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {companies.map(company => (
               <tr key={company.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 whitespace-nowrap">
                   <span className="font-medium text-gray-900">{company.name}</span>
                 </td>
-                <td className="px-6 py-4 text-gray-600 font-mono text-sm">{company.slug}</td>
-                <td className="px-6 py-4 text-gray-600">{company.user_count}人</td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4 text-gray-600 font-mono text-sm whitespace-nowrap">{company.slug}</td>
+                <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{company.user_count}人</td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <button
                     onClick={() => toggleActive(company)}
                     className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 ${
@@ -192,10 +192,10 @@ export default function CompaniesPage() {
                     {company.is_active ? '有効' : '無効'}
                   </button>
                 </td>
-                <td className="px-6 py-4 text-gray-500 text-sm">
+                <td className="px-6 py-4 text-gray-500 text-sm whitespace-nowrap">
                   {new Date(company.created_at).toLocaleDateString('ja-JP')}
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right whitespace-nowrap">
                   <div className="flex justify-end gap-2">
                     <button
                       onClick={() => openEditModal(company)}
