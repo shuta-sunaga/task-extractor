@@ -162,8 +162,8 @@ export default function CompaniesPage() {
       </div>
 
       {/* 企業一覧 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">企業名</th>

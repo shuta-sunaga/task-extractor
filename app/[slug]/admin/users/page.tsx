@@ -308,8 +308,8 @@ export default function UsersPage() {
       </div>
 
       {/* ユーザー一覧 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+        <table className="w-full min-w-[900px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">名前</th>
