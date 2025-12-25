@@ -307,19 +307,6 @@ export default function UsersPage() {
         </button>
       </div>
 
-      {/* タブナビゲーション */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
-        <div className="px-4 py-2 text-teal-600 border-b-2 border-teal-600 font-medium">
-          ユーザー
-        </div>
-        <Link
-          href={`/${slug}/admin/roles`}
-          className="px-4 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-t-lg"
-        >
-          ロール
-        </Link>
-      </div>
-
       {/* ユーザー一覧 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
         <table className="w-full">
@@ -424,6 +411,15 @@ export default function UsersPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* ロール管理への導線 */}
+      <div className="mt-4 text-sm text-gray-500">
+        ロールの作成・編集は
+        <Link href={`/${slug}/admin/roles`} className="text-teal-600 hover:underline mx-1">
+          ロール管理ページ
+        </Link>
+        から行えます
       </div>
 
       {/* モーダル */}

@@ -309,19 +309,6 @@ export default function RolesPage() {
         </button>
       </div>
 
-      {/* タブナビゲーション */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
-        <Link
-          href={`/${slug}/admin/users`}
-          className="px-4 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-t-lg"
-        >
-          ユーザー
-        </Link>
-        <div className="px-4 py-2 text-teal-600 border-b-2 border-teal-600 font-medium">
-          ロール
-        </div>
-      </div>
-
       {/* 説明 */}
       <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <p className="text-sm text-blue-700">
@@ -412,6 +399,15 @@ export default function RolesPage() {
             ロールがありません
           </div>
         )}
+      </div>
+
+      {/* ユーザー管理への導線 */}
+      <div className="mt-4 text-sm text-gray-500">
+        ユーザーへのロール割り当ては
+        <Link href={`/${slug}/admin/users`} className="text-teal-600 hover:underline mx-1">
+          ユーザー管理ページ
+        </Link>
+        から行えます
       </div>
 
       {/* ロール作成/編集モーダル */}
