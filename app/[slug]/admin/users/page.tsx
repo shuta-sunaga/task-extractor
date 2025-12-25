@@ -5,6 +5,11 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
+type UserRole = {
+  id: number
+  name: string
+}
+
 type User = {
   id: number
   company_id: number | null
@@ -14,6 +19,7 @@ type User = {
   is_active: boolean
   last_login_at: string | null
   created_at: string
+  roles: UserRole[]
 }
 
 type Role = {
@@ -23,11 +29,6 @@ type Role = {
   description: string | null
 }
 
-type UserRole = {
-  id: number
-  name: string
-}
-
 export default function UsersPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -35,7 +36,6 @@ export default function UsersPage() {
   const slug = params.slug as string
   const [users, setUsers] = useState<User[]>([])
   const [roles, setRoles] = useState<Role[]>([])
-  const [userRolesMap, setUserRolesMap] = useState<Record<number, UserRole[]>>({})
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -91,25 +91,7 @@ export default function UsersPage() {
       ])
 
       if (usersRes.ok) {
-        const usersData = await usersRes.json()
-        setUsers(usersData)
-
-        // 各ユーザーのロールを取得
-        const rolesMap: Record<number, UserRole[]> = {}
-        await Promise.all(
-          usersData.map(async (user: User) => {
-            try {
-              const res = await fetch(`/api/users/${user.id}/roles`)
-              if (res.ok) {
-                const data = await res.json()
-                rolesMap[user.id] = data.roles || []
-              }
-            } catch {
-              rolesMap[user.id] = []
-            }
-          })
-        )
-        setUserRolesMap(rolesMap)
+        setUsers(await usersRes.json())
       }
 
       if (rolesRes.ok) {
@@ -127,7 +109,9 @@ export default function UsersPage() {
       const res = await fetch(`/api/users/${userId}/roles`)
       if (res.ok) {
         const data = await res.json()
-        setUserRolesMap(prev => ({ ...prev, [userId]: data.roles || [] }))
+        setUsers(prev => prev.map(u =>
+          u.id === userId ? { ...u, roles: data.roles || [] } : u
+        ))
       }
     } catch {
       console.error('Failed to fetch user roles')
@@ -337,8 +321,8 @@ export default function UsersPage() {
                   {user.user_type === 'user' ? (
                     <div className="flex items-center gap-2">
                       <div className="flex flex-wrap gap-1">
-                        {(userRolesMap[user.id] || []).length > 0 ? (
-                          userRolesMap[user.id].map(role => (
+                        {user.roles.length > 0 ? (
+                          user.roles.map(role => (
                             <span
                               key={role.id}
                               className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs"
@@ -520,7 +504,7 @@ export default function UsersPage() {
             {roles.length > 0 ? (
               <div className="space-y-2 mb-6">
                 {roles.map(role => {
-                  const userRoles = userRolesMap[roleTargetUser.id] || []
+                  const userRoles = roleTargetUser.roles
                   const hasRole = userRoles.some(r => r.id === role.id)
                   return (
                     <label

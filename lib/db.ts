@@ -1011,6 +1011,29 @@ export async function getUserRoles(userId: number): Promise<Role[]> {
   return result.rows as Role[]
 }
 
+export async function getAllUserRolesMap(companyId?: number): Promise<Record<number, { id: number; name: string }[]>> {
+  const result = companyId
+    ? await sql`
+        SELECT ur.user_id, r.id, r.name FROM user_roles ur
+        INNER JOIN roles r ON ur.role_id = r.id
+        WHERE r.company_id = ${companyId}
+      `
+    : await sql`
+        SELECT ur.user_id, r.id, r.name FROM user_roles ur
+        INNER JOIN roles r ON ur.role_id = r.id
+      `
+
+  const map: Record<number, { id: number; name: string }[]> = {}
+  for (const row of result.rows) {
+    const userId = row.user_id as number
+    if (!map[userId]) {
+      map[userId] = []
+    }
+    map[userId].push({ id: row.id as number, name: row.name as string })
+  }
+  return map
+}
+
 export async function addUserRole(userId: number, roleId: number): Promise<void> {
   await sql`
     INSERT INTO user_roles (user_id, role_id)
