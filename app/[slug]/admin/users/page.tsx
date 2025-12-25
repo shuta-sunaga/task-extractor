@@ -16,15 +16,32 @@ type User = {
   created_at: string
 }
 
+type Role = {
+  id: number
+  company_id: number
+  name: string
+  description: string | null
+}
+
+type UserRole = {
+  id: number
+  name: string
+}
+
 export default function UsersPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
   const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
+  const [userRolesMap, setUserRolesMap] = useState<Record<number, UserRole[]>>({})
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [showRoleModal, setShowRoleModal] = useState(false)
+  const [roleTargetUser, setRoleTargetUser] = useState<User | null>(null)
+  const [roleUpdating, setRoleUpdating] = useState(false)
   const [message, setMessage] = useState('')
   const [accessDenied, setAccessDenied] = useState(false)
 
@@ -63,20 +80,57 @@ export default function UsersPage() {
       return
     }
 
-    fetchUsers()
+    fetchData()
   }, [session, status, slug, router])
 
-  async function fetchUsers() {
+  async function fetchData() {
     try {
-      const res = await fetch('/api/users')
-      if (res.ok) {
-        const data = await res.json()
-        setUsers(data)
+      const [usersRes, rolesRes] = await Promise.all([
+        fetch('/api/users'),
+        fetch('/api/roles'),
+      ])
+
+      if (usersRes.ok) {
+        const usersData = await usersRes.json()
+        setUsers(usersData)
+
+        // 各ユーザーのロールを取得
+        const rolesMap: Record<number, UserRole[]> = {}
+        await Promise.all(
+          usersData.map(async (user: User) => {
+            try {
+              const res = await fetch(`/api/users/${user.id}/roles`)
+              if (res.ok) {
+                const data = await res.json()
+                rolesMap[user.id] = data.roles || []
+              }
+            } catch {
+              rolesMap[user.id] = []
+            }
+          })
+        )
+        setUserRolesMap(rolesMap)
+      }
+
+      if (rolesRes.ok) {
+        setRoles(await rolesRes.json())
       }
     } catch (error) {
-      console.error('Failed to fetch users:', error)
+      console.error('Failed to fetch data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchUserRoles(userId: number) {
+    try {
+      const res = await fetch(`/api/users/${userId}/roles`)
+      if (res.ok) {
+        const data = await res.json()
+        setUserRolesMap(prev => ({ ...prev, [userId]: data.roles || [] }))
+      }
+    } catch {
+      console.error('Failed to fetch user roles')
     }
   }
 
@@ -107,7 +161,7 @@ export default function UsersPage() {
         setShowModal(false)
         setEditingUser(null)
         setFormData({ email: '', password: '', name: '', userType: 'user' })
-        fetchUsers()
+        fetchData()
       } else {
         const data = await res.json()
         setMessage(data.error || '保存に失敗しました')
@@ -123,7 +177,7 @@ export default function UsersPage() {
     try {
       const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' })
       if (res.ok) {
-        fetchUsers()
+        fetchData()
       } else {
         const data = await res.json()
         alert(data.error || '削除に失敗しました')
@@ -141,10 +195,40 @@ export default function UsersPage() {
         body: JSON.stringify({ isActive: !user.is_active }),
       })
       if (res.ok) {
-        fetchUsers()
+        fetchData()
       }
     } catch {
       console.error('Failed to toggle user status')
+    }
+  }
+
+  function openRoleModal(user: User) {
+    setRoleTargetUser(user)
+    setShowRoleModal(true)
+  }
+
+  async function toggleUserRole(roleId: number, hasRole: boolean) {
+    if (!roleTargetUser || roleUpdating) return
+
+    setRoleUpdating(true)
+    try {
+      const res = await fetch('/api/roles', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: roleTargetUser.id,
+          roleId,
+          action: hasRole ? 'remove' : 'add',
+        }),
+      })
+
+      if (res.ok) {
+        await fetchUserRoles(roleTargetUser.id)
+      }
+    } catch {
+      console.error('Failed to toggle user role')
+    } finally {
+      setRoleUpdating(false)
     }
   }
 
@@ -231,6 +315,7 @@ export default function UsersPage() {
               <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">名前</th>
               <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">メール</th>
               <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">種別</th>
+              <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">ロール</th>
               <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">状態</th>
               <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">最終ログイン</th>
               <th className="text-right px-6 py-3 text-sm font-medium text-gray-500">操作</th>
@@ -247,6 +332,37 @@ export default function UsersPage() {
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${userTypeBadge(user.user_type)}`}>
                     {userTypeLabel(user.user_type)}
                   </span>
+                </td>
+                <td className="px-6 py-4">
+                  {user.user_type === 'user' ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap gap-1">
+                        {(userRolesMap[user.id] || []).length > 0 ? (
+                          userRolesMap[user.id].map(role => (
+                            <span
+                              key={role.id}
+                              className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs"
+                            >
+                              {role.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-400 text-xs">未設定</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => openRoleModal(user)}
+                        className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                        title="ロールを設定"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 text-xs">—</span>
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   <button
@@ -288,7 +404,7 @@ export default function UsersPage() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                   ユーザーがいません
                 </td>
               </tr>
@@ -377,6 +493,79 @@ export default function UsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ロール付与モーダル */}
+      {showRoleModal && roleTargetUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              ロールを設定
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              {roleTargetUser.name} に付与するロールを選択してください
+            </p>
+
+            {roles.length > 0 ? (
+              <div className="space-y-2 mb-6">
+                {roles.map(role => {
+                  const userRoles = userRolesMap[roleTargetUser.id] || []
+                  const hasRole = userRoles.some(r => r.id === role.id)
+                  return (
+                    <label
+                      key={role.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        hasRole
+                          ? 'bg-indigo-50 border-indigo-300'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      } ${roleUpdating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={hasRole}
+                        onChange={() => toggleUserRole(role.id, hasRole)}
+                        disabled={roleUpdating}
+                        className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{role.name}</div>
+                        {role.description && (
+                          <div className="text-xs text-gray-500">{role.description}</div>
+                        )}
+                      </div>
+                      {roleUpdating && hasRole && (
+                        <svg className="animate-spin h-4 w-4 text-indigo-600" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p className="mb-2">ロールがありません</p>
+                <Link
+                  href={`/${slug}/admin/roles`}
+                  className="text-indigo-600 hover:underline text-sm"
+                >
+                  ロールを作成する →
+                </Link>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowRoleModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                閉じる
+              </button>
+            </div>
           </div>
         </div>
       )}
