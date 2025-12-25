@@ -175,6 +175,12 @@ export async function initDatabase() {
     ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'chatwork'
   `
 
+  // memo カラム追加
+  await sql`
+    ALTER TABLE tasks
+    ADD COLUMN IF NOT EXISTS memo TEXT
+  `
+
   // workspace_id カラム追加（Slack用）
   await sql`
     ALTER TABLE rooms
@@ -649,6 +655,14 @@ export async function updateTaskStatus(id: number, status: string) {
   await sql`
     UPDATE tasks
     SET status = ${status}, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${id}
+  `
+}
+
+export async function updateTaskMemo(id: number, memo: string | null) {
+  await sql`
+    UPDATE tasks
+    SET memo = ${memo}, updated_at = CURRENT_TIMESTAMP
     WHERE id = ${id}
   `
 }

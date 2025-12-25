@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { updateTaskStatus, deleteTask, getTaskById } from '@/lib/db'
+import { updateTaskStatus, updateTaskMemo, deleteTask, getTaskById } from '@/lib/db'
 import { sendTaskNotification } from '@/lib/email'
 import { requireAuth, checkTaskPermission, type SessionUser } from '@/lib/session'
 
@@ -37,20 +37,28 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden: No edit permission' }, { status: 403 })
     }
 
-    await updateTaskStatus(taskId, body.status)
+    // ステータス更新
+    if (body.status !== undefined) {
+      await updateTaskStatus(taskId, body.status)
 
-    // 完了時のみ通知
-    if (body.status === 'completed' && task) {
-      sendTaskNotification({
-        id: task.id,
-        content: task.content,
-        sender_name: task.sender_name,
-        source: task.source,
-        priority: task.priority,
-        status: 'completed',
-      }, 'complete').catch(err => {
-        console.error('[Email] Failed to send complete notification:', err)
-      })
+      // 完了時のみ通知
+      if (body.status === 'completed' && task) {
+        sendTaskNotification({
+          id: task.id,
+          content: task.content,
+          sender_name: task.sender_name,
+          source: task.source,
+          priority: task.priority,
+          status: 'completed',
+        }, 'complete').catch(err => {
+          console.error('[Email] Failed to send complete notification:', err)
+        })
+      }
+    }
+
+    // メモ更新
+    if (body.memo !== undefined) {
+      await updateTaskMemo(taskId, body.memo || null)
     }
 
     return NextResponse.json({ success: true })

@@ -15,6 +15,7 @@ type Task = {
   priority: 'high' | 'medium' | 'low'
   source: 'chatwork' | 'teams' | 'lark' | 'slack'
   created_at: string
+  memo: string | null
 }
 
 const sourceColors = {
@@ -71,6 +72,12 @@ export default function Dashboard() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+
+  // メモ編集用
+  const [editingMemoId, setEditingMemoId] = useState<number | null>(null)
+  const [memoText, setMemoText] = useState('')
+  const [savingMemo, setSavingMemo] = useState(false)
+  const [expandedMemoIds, setExpandedMemoIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     if (sessionStatus === 'loading') return
@@ -163,6 +170,54 @@ export default function Dashboard() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  // メモ保存
+  async function saveMemo(id: number) {
+    setSavingMemo(true)
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memo: memoText }),
+      })
+      if (res.ok) {
+        setTasks(tasks.map(task =>
+          task.id === id ? { ...task, memo: memoText || null } : task
+        ))
+        setEditingMemoId(null)
+        setMemoText('')
+      }
+    } catch (error) {
+      console.error('Failed to save memo:', error)
+    } finally {
+      setSavingMemo(false)
+    }
+  }
+
+  // メモ編集開始
+  function startEditingMemo(task: Task) {
+    setEditingMemoId(task.id)
+    setMemoText(task.memo || '')
+  }
+
+  // メモ編集キャンセル
+  function cancelEditingMemo() {
+    setEditingMemoId(null)
+    setMemoText('')
+  }
+
+  // メモ展開トグル
+  function toggleMemoExpand(id: number) {
+    setExpandedMemoIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
   }
 
   const filteredTasks = tasks.filter(task => {
@@ -361,6 +416,107 @@ export default function Dashboard() {
                   {task.original_message}
                 </p>
               </details>
+
+              {/* メモセクション */}
+              <div className="mb-4">
+                {editingMemoId === task.id ? (
+                  // メモ編集モード
+                  <div className="border border-teal-200 rounded-lg p-3 bg-teal-50/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <span className="text-sm font-medium text-teal-700">メモを編集</span>
+                    </div>
+                    <textarea
+                      value={memoText}
+                      onChange={(e) => setMemoText(e.target.value)}
+                      placeholder="タスクに関するメモを入力..."
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none"
+                      autoFocus
+                    />
+                    <div className="flex gap-2 mt-2 justify-end">
+                      <button
+                        onClick={cancelEditingMemo}
+                        disabled={savingMemo}
+                        className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        onClick={() => saveMemo(task.id)}
+                        disabled={savingMemo}
+                        className="px-3 py-1 text-sm bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors disabled:opacity-50"
+                      >
+                        {savingMemo ? '保存中...' : '保存'}
+                      </button>
+                    </div>
+                  </div>
+                ) : task.memo ? (
+                  // メモ表示モード（メモがある場合）
+                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-600">メモ</span>
+                      </div>
+                      <button
+                        onClick={() => startEditingMemo(task)}
+                        className="text-xs text-teal-600 hover:text-teal-700 hover:underline"
+                      >
+                        編集
+                      </button>
+                    </div>
+                    {task.memo.length > 100 ? (
+                      // 長いメモはアコーディオンで表示
+                      <div>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {expandedMemoIds.has(task.id)
+                            ? task.memo
+                            : task.memo.slice(0, 100) + '...'}
+                        </p>
+                        <button
+                          onClick={() => toggleMemoExpand(task.id)}
+                          className="mt-2 text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
+                        >
+                          {expandedMemoIds.has(task.id) ? (
+                            <>
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                              折りたたむ
+                            </>
+                          ) : (
+                            <>
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                              すべて表示 ({task.memo.length}文字)
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      // 短いメモはそのまま表示
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{task.memo}</p>
+                    )}
+                  </div>
+                ) : (
+                  // メモがない場合 - 追加ボタン
+                  <button
+                    onClick={() => startEditingMemo(task)}
+                    className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-teal-600 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    メモを追加
+                  </button>
+                )}
+              </div>
 
               <div className="flex gap-2">
                 {task.status !== 'pending' && (
