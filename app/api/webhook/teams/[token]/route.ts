@@ -103,6 +103,7 @@ export async function POST(
       priority: analysis.priority,
       source: 'teams',
       companyId,
+      serviceUrl: message.serviceUrl,
     })
 
     console.log('[Teams Webhook] Task created:', task.id)

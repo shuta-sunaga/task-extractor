@@ -53,6 +53,7 @@ export type TeamsMessage = {
   conversationId: string
   text: string
   senderName: string
+  serviceUrl?: string
   teamId?: string
   channelId?: string
   channelName?: string
@@ -144,6 +145,7 @@ export function parseTeamsPayload(payload: TeamsWebhookPayload): TeamsMessage {
     conversationId: normalizeConversationId(payload.conversation.id),
     text: stripMention(payload.text || ''),
     senderName: payload.from?.name || 'Unknown',
+    serviceUrl: payload.serviceUrl,
     teamId: payload.channelData?.teamsTeamId,
     channelId: payload.channelData?.teamsChannelId,
     channelName: payload.channelData?.channel?.name,

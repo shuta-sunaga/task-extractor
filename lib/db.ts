@@ -181,6 +181,12 @@ export async function initDatabase() {
     ADD COLUMN IF NOT EXISTS memo TEXT
   `
 
+  // service_url カラム追加（Teams用）
+  await sql`
+    ALTER TABLE tasks
+    ADD COLUMN IF NOT EXISTS service_url TEXT
+  `
+
   // workspace_id カラム追加（Slack用）
   await sql`
     ALTER TABLE rooms
@@ -633,19 +639,20 @@ export async function createTask(task: {
   priority: string
   source?: Source
   companyId?: number
+  serviceUrl?: string
 }) {
   const source = task.source || 'chatwork'
   if (task.companyId) {
     const result = await sql`
-      INSERT INTO tasks (room_id, message_id, content, original_message, sender_name, priority, source, company_id)
-      VALUES (${task.roomId}, ${task.messageId}, ${task.content}, ${task.originalMessage}, ${task.senderName}, ${task.priority}, ${source}, ${task.companyId})
+      INSERT INTO tasks (room_id, message_id, content, original_message, sender_name, priority, source, company_id, service_url)
+      VALUES (${task.roomId}, ${task.messageId}, ${task.content}, ${task.originalMessage}, ${task.senderName}, ${task.priority}, ${source}, ${task.companyId}, ${task.serviceUrl || null})
       RETURNING *
     `
     return result.rows[0]
   }
   const result = await sql`
-    INSERT INTO tasks (room_id, message_id, content, original_message, sender_name, priority, source)
-    VALUES (${task.roomId}, ${task.messageId}, ${task.content}, ${task.originalMessage}, ${task.senderName}, ${task.priority}, ${source})
+    INSERT INTO tasks (room_id, message_id, content, original_message, sender_name, priority, source, service_url)
+    VALUES (${task.roomId}, ${task.messageId}, ${task.content}, ${task.originalMessage}, ${task.senderName}, ${task.priority}, ${source}, ${task.serviceUrl || null})
     RETURNING *
   `
   return result.rows[0]

@@ -16,6 +16,37 @@ type Task = {
   source: 'chatwork' | 'teams' | 'lark' | 'slack'
   created_at: string
   memo: string | null
+  service_url: string | null
+}
+
+// メッセージ元URLを生成
+function generateMessageUrl(task: Task): string | null {
+  const { source, room_id, message_id, service_url } = task
+
+  switch (source) {
+    case 'chatwork':
+      // Chatwork: https://www.chatwork.com/#!rid{room_id}-{message_id}
+      return `https://www.chatwork.com/#!rid${room_id}-${message_id}`
+
+    case 'slack':
+      // Slack: https://app.slack.com/archives/{channel}/p{timestamp}
+      const slackTs = message_id.replace('.', '')
+      return `https://app.slack.com/archives/${room_id}/p${slackTs}`
+
+    case 'teams':
+      // Teams: serviceUrlが必要
+      if (service_url) {
+        return `${service_url}conversations/${room_id}?messageId=${message_id}`
+      }
+      return null
+
+    case 'lark':
+      // Lark: チャットレベルのリンクのみ
+      return `https://applink.larksuite.com/client/chat/open?openChatId=${room_id}`
+
+    default:
+      return null
+  }
 }
 
 const sourceColors = {
@@ -405,7 +436,26 @@ export default function Dashboard() {
               </div>
 
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {task.content}
+                {(() => {
+                  const messageUrl = generateMessageUrl(task)
+                  if (messageUrl) {
+                    return (
+                      <a
+                        href={messageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-teal-600 hover:underline inline-flex items-center gap-1"
+                        title={`${sourceLabels[task.source]}で開く`}
+                      >
+                        {task.content}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    )
+                  }
+                  return task.content
+                })()}
               </h3>
 
               <div className="text-sm text-gray-500 mb-4">
