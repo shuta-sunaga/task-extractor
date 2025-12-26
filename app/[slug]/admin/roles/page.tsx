@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
-type Source = 'chatwork' | 'teams' | 'lark' | 'slack'
+type Source = 'chatwork' | 'teams' | 'lark' | 'slack' | 'line'
 
 type Permission = {
   id: number
@@ -39,13 +39,15 @@ const sourceLabels: Record<Source, string> = {
   teams: 'Teams',
   lark: 'Lark',
   slack: 'Slack',
+  line: 'LINE',
 }
 
 const sourceColors: Record<Source, string> = {
-  chatwork: 'bg-green-100 text-green-700',
+  chatwork: 'bg-red-100 text-red-700',
   teams: 'bg-purple-100 text-purple-700',
   lark: 'bg-blue-100 text-blue-700',
   slack: 'bg-pink-100 text-pink-700',
+  line: 'bg-emerald-100 text-emerald-700',
 }
 
 export default function RolesPage() {
@@ -547,6 +549,7 @@ export default function RolesPage() {
                     <option value="teams">Teams</option>
                     <option value="lark">Lark</option>
                     <option value="slack">Slack</option>
+                    <option value="line">LINE</option>
                   </select>
                 </div>
                 <div>

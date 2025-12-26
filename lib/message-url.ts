@@ -3,7 +3,7 @@
  * 各メッセンジャーツールのメッセージへのリンクを生成
  */
 
-export type Source = 'chatwork' | 'teams' | 'lark' | 'slack'
+export type Source = 'chatwork' | 'teams' | 'lark' | 'slack' | 'line'
 
 type MessageUrlParams = {
   source: Source
@@ -40,6 +40,10 @@ export function generateMessageUrl(params: MessageUrlParams): string | null {
       // https://applink.larksuite.com/client/chat/open?openChatId={chat_id}
       return `https://applink.larksuite.com/client/chat/open?openChatId=${roomId}`
 
+    case 'line':
+      // LINE: メッセージへのパーマリンク機能なし
+      return null
+
     default:
       return null
   }
@@ -58,6 +62,8 @@ export function getMessageUrlDescription(source: Source): string {
       return 'Teamsで会話を開く'
     case 'lark':
       return 'Larkでチャットを開く'
+    case 'line':
+      return 'LINEで確認'
     default:
       return 'メッセージを開く'
   }
