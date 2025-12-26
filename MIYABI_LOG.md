@@ -509,6 +509,103 @@
 
 ---
 
+## 2025-12-25
+
+### セッション 15
+
+#### 指示
+- テストコードを実装し、テスト計画を作成
+- ユーザー管理とロール管理ページ間の導線を追加
+- ページ読み込みが遅い問題を調査・修正
+
+#### 実施内容
+1. **テスト基盤構築**
+   - Jest + React Testing Library をセットアップ
+   - `jest.config.ts`, `jest.setup.ts` を作成
+   - `npm test`, `npm run test:coverage` スクリプト追加
+
+2. **テスト計画書作成** (`TEST_PLAN.md`)
+   - テスト対象の優先順位付け
+   - テストケース詳細（認証・認可・API）
+   - モック戦略、実行計画
+
+3. **テストコード実装** (`__tests__/`)
+   - `lib/session.test.ts`: 17テスト
+     - `isSystemAdmin`, `isAdmin` 関数
+     - `checkTaskPermission`（権限マッチング、ワイルドカード）
+     - `filterTasksByPermission`（ロール別フィルタリング）
+   - `api/tasks.test.ts`: 20テスト
+     - GET/POST/PATCH/DELETE の認証・認可チェック
+     - 企業IDによるアクセス制御
+   - **結果**: 全37テストパス、カバレッジ88%（session.ts）
+
+4. **ページ間導線追加** (`app/[slug]/admin/users/page.tsx`, `roles/page.tsx`)
+   - 当初タブナビゲーションで実装 → シンプルなテキストリンクに変更
+   - ユーザー管理: 「ロールの作成・編集は ロール管理ページ から行えます」
+   - ロール管理: 「ユーザーへのロール割り当ては ユーザー管理ページ から行えます」
+
+5. **N+1クエリ問題修正**
+   - **問題**: ユーザー管理ページでユーザー数分のAPIリクエストが発生
+     - 旧: `/api/users` + `/api/users/{id}/roles` × N回 = 2+N リクエスト
+   - **解決策**:
+     - `lib/db.ts`: `getAllUserRolesMap()` 追加（全ユーザーのロールを1クエリで取得）
+     - `app/api/users/route.ts`: レスポンスに`roles`を含める
+     - 新: `/api/users`（ロール込み） + `/api/roles` = 2リクエスト
+
+#### 備考
+- テストはモック戦略で外部依存を排除（next-auth, db, email）
+- カバレッジ100%は可能だが、ROI的に80-90%が実用的
+- N+1問題はユーザー数が多いほど影響大（50人 → 52リクエストが2リクエストに）
+
+---
+
+## 2025-12-26
+
+### セッション 16
+
+#### 指示
+- タスクにメモ機能を追加（アコーディオンで展開可能）
+- メッセージ元URLをタスクタイトルにリンクとして設置
+
+#### 実施内容
+1. **メモ機能実装**
+   - `lib/db.ts`: `memo`カラム追加、`updateTaskMemo()`関数追加
+   - `app/api/tasks/[id]/route.ts`: PATCHでメモ更新対応
+     - ステータス更新: `canEditStatus`権限が必要
+     - メモ更新: `canView`権限のみで可能（権限を分離）
+   - `app/[slug]/page.tsx`: メモUI追加
+     - メモがない場合: 「+ メモを追加」ボタン
+     - メモがある場合: 表示 + 「編集」ボタン
+     - 100文字超: アコーディオンで折りたたみ（「すべて表示 (N文字)」）
+     - 編集モード: テキストエリア + 保存/キャンセル
+   - エラーハンドリング: 保存失敗時にアラート表示
+
+2. **メッセージ元URL機能実装**
+   - 各メッセンジャーのURL形式を調査
+   - `lib/message-url.ts`: URL生成ユーティリティ（新規）
+   - `app/[slug]/page.tsx`: タスクタイトルをクリック可能なリンクに
+     - 外部リンクアイコン付き
+     - ホバー時にteal色で強調
+
+   | ツール | URL形式 | 対応レベル |
+   |--------|---------|------------|
+   | Chatwork | `https://www.chatwork.com/#!rid{room_id}-{message_id}` | 特定メッセージ |
+   | Slack | `https://app.slack.com/archives/{channel}/p{timestamp}` | 特定メッセージ |
+   | Teams | `https://teams.microsoft.com/l/message/{channelId}/{messageId}` | 特定メッセージ |
+   | Lark | `https://applink.larksuite.com/client/chat/open?openChatId={chat_id}` | チャットのみ |
+
+3. **Teams URL修正**
+   - 当初`serviceUrl`ベースで実装 → 動作せず
+   - Microsoft公式のdeep link形式に修正
+   - `serviceUrl`カラムは追加したが未使用（将来用）
+
+#### 備考
+- メモ機能は閲覧権限があれば誰でも編集可能（ステータス変更より緩い権限）
+- Larkはメッセージレベルのdeep linkがAPI非公開のため、チャット画面へのリンクのみ
+- 既存タスクも含め、全タスクでリンクが機能する（DB migration不要）
+
+---
+
 <!--
 使い方:
 - 新しいセッションごとに「### セッション N」を追加
