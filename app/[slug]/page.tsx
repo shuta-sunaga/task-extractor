@@ -51,7 +51,7 @@ function generateMessageUrl(task: Task): string | null {
 }
 
 const sourceColors = {
-  chatwork: 'bg-green-100 text-green-700',
+  chatwork: 'bg-red-100 text-red-700',
   teams: 'bg-purple-100 text-purple-700',
   lark: 'bg-blue-100 text-blue-700',
   slack: 'bg-pink-100 text-pink-700',
@@ -367,8 +367,8 @@ export default function Dashboard() {
                 onClick={() => setSourceFilter('chatwork')}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                   sourceFilter === 'chatwork'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-green-50 text-green-700 hover:bg-green-100'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-red-50 text-red-700 hover:bg-red-100'
                 }`}
               >
                 CW

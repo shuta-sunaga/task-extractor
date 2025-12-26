@@ -862,15 +862,15 @@ export default function SettingsPage() {
             onClick={() => handleTabChange('chatwork')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'chatwork'
-                ? 'border-green-600 text-green-600'
+                ? 'border-red-600 text-red-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             <span className="flex items-center gap-2">
               {tabLoading === 'chatwork' ? (
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               ) : (
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                <span className="w-2 h-2 rounded-full bg-red-500"></span>
               )}
               Chatwork
             </span>
@@ -1138,7 +1138,7 @@ export default function SettingsPage() {
                   APIトークン
                 </label>
                 {settings.has_chatwork_token && (
-                  <p className="text-sm text-green-600 mb-2">
+                  <p className="text-sm text-red-600 mb-2">
                     現在のトークン: {settings.chatwork_api_token}
                   </p>
                 )}
@@ -1147,7 +1147,7 @@ export default function SettingsPage() {
                   value={apiToken}
                   onChange={e => setApiToken(e.target.value)}
                   placeholder={settings.has_chatwork_token ? '新しいトークンを入力（変更する場合）' : 'APIトークンを入力'}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   Chatwork管理画面 → サービス連携 → APIトークン から取得できます
@@ -1163,7 +1163,7 @@ export default function SettingsPage() {
                   value={webhookToken}
                   onChange={e => setWebhookToken(e.target.value)}
                   placeholder="Webhook設定画面のトークンを入力"
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   Chatwork Webhook編集画面で表示されるトークンを入力してください
@@ -1173,7 +1173,7 @@ export default function SettingsPage() {
               <button
                 onClick={saveChatworkSettings}
                 disabled={saving}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {saving ? '保存中...' : '設定を保存'}
               </button>
@@ -1227,7 +1227,7 @@ export default function SettingsPage() {
                       type="checkbox"
                       checked={room.is_active}
                       onChange={e => toggleRoom(room.room_id, e.target.checked, 'chatwork')}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
+                      className="w-5 h-5 text-red-600 rounded focus:ring-red-500"
                     />
                     <span className="text-gray-900">{room.room_name}</span>
                   </label>
