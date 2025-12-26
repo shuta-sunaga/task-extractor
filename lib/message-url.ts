@@ -32,14 +32,8 @@ export function generateMessageUrl(params: MessageUrlParams): string | null {
       return `https://app.slack.com/archives/${roomId}/p${slackTs}`
 
     case 'teams':
-      // Teams: serviceUrlが必要
-      // 現時点ではserviceUrlを保存していないため、将来の実装用
-      if (serviceUrl) {
-        // Teams deep link format (簡易版)
-        // 完全なdeep linkはより複雑だが、基本的な形式
-        return `${serviceUrl}conversations/${roomId}?messageId=${messageId}`
-      }
-      return null
+      // Teams: https://teams.microsoft.com/l/message/{channelId}/{messageId}
+      return `https://teams.microsoft.com/l/message/${encodeURIComponent(roomId)}/${encodeURIComponent(messageId)}`
 
     case 'lark':
       // Lark: チャットレベルのリンクのみ（特定メッセージへのジャンプは非対応）

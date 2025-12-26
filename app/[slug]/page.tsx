@@ -34,11 +34,8 @@ function generateMessageUrl(task: Task): string | null {
       return `https://app.slack.com/archives/${room_id}/p${slackTs}`
 
     case 'teams':
-      // Teams: serviceUrlが必要
-      if (service_url) {
-        return `${service_url}conversations/${room_id}?messageId=${message_id}`
-      }
-      return null
+      // Teams: https://teams.microsoft.com/l/message/{channelId}/{messageId}
+      return `https://teams.microsoft.com/l/message/${encodeURIComponent(room_id)}/${encodeURIComponent(message_id)}`
 
     case 'lark':
       // Lark: チャットレベルのリンクのみ
