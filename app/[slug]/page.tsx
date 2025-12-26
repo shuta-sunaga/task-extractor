@@ -13,7 +13,7 @@ type Task = {
   sender_name: string
   status: 'pending' | 'in_progress' | 'completed'
   priority: 'high' | 'medium' | 'low'
-  source: 'chatwork' | 'teams' | 'lark' | 'slack'
+  source: 'chatwork' | 'teams' | 'lark' | 'slack' | 'line'
   created_at: string
   memo: string | null
   service_url: string | null
@@ -41,6 +41,10 @@ function generateMessageUrl(task: Task): string | null {
       // Lark: チャットレベルのリンクのみ
       return `https://applink.larksuite.com/client/chat/open?openChatId=${room_id}`
 
+    case 'line':
+      // LINE: メッセージ単位のパーマリンクなし
+      return null
+
     default:
       return null
   }
@@ -51,6 +55,7 @@ const sourceColors = {
   teams: 'bg-purple-100 text-purple-700',
   lark: 'bg-blue-100 text-blue-700',
   slack: 'bg-pink-100 text-pink-700',
+  line: 'bg-emerald-100 text-emerald-700',
 }
 
 const sourceLabels = {
@@ -58,6 +63,7 @@ const sourceLabels = {
   teams: 'Teams',
   lark: 'Lark',
   slack: 'Slack',
+  line: 'LINE',
 }
 
 const statusLabels = {
@@ -397,6 +403,16 @@ export default function Dashboard() {
               >
                 Slack
               </button>
+              <button
+                onClick={() => setSourceFilter('line')}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  sourceFilter === 'line'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                }`}
+              >
+                LINE
+              </button>
             </div>
           </div>
         </div>
@@ -405,7 +421,7 @@ export default function Dashboard() {
       {filteredTasks.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
           {tasks.length === 0
-            ? 'タスクがありません。Chatwork、Teams、Larkからメッセージを受信すると、ここに表示されます。'
+            ? 'タスクがありません。Chatwork、Teams、Lark、Slack、LINEからメッセージを受信すると、ここに表示されます。'
             : '該当するタスクがありません。'}
         </div>
       ) : (

@@ -606,6 +606,66 @@
 
 ---
 
+### セッション 17
+
+#### 指示
+- LINE連携を追加
+
+#### 実施内容
+1. **LINE Messaging APIライブラリ作成** (`lib/line.ts`)
+   - `LineWebhookEvent`, `LineWebhookPayload`, `LineMessage` 型定義
+   - `verifyLineSignature()`: X-Line-Signature検証（HMAC-SHA256、タイミング攻撃対策）
+   - `isMessageEvent()`, `isJoinEvent()`, `isGroupEvent()`: イベント判定ヘルパー
+   - `parseLineEvent()`: イベントを正規化されたメッセージ形式に変換
+   - `getGroupMemberProfile()`, `getGroupSummary()`: LINE API連携
+   - `replyMessage()`: リプライ送信（将来用）
+
+2. **DB設計変更** (`lib/db.ts`)
+   - `Source`型に`'line'`を追加
+   - `line_channel_secret`, `line_access_token`カラム追加
+   - `saveLineSettings()`関数追加
+   - `createRoom()`に`isActive`パラメータ追加（手動承認フロー用）
+
+3. **LINE Webhookエンドポイント** (`app/api/webhook/line/[token]/route.ts`)
+   - 企業識別: Webhook URLのトークンから企業を特定
+   - 署名検証: X-Line-Signatureヘッダー
+   - グループ参加イベント処理:
+     - ボットがグループに追加されると、`is_active=false`で登録
+     - 管理者が設定画面で承認するまで監視しない（セキュリティ対策）
+   - メッセージイベント処理:
+     - 承認済みグループのみ処理
+     - タスク分析 → DB保存 → メール通知
+
+4. **設定ページ更新** (`app/[slug]/settings/page.tsx`)
+   - LINEタブ追加（エメラルド色）
+   - Channel Secret / Channel Access Token入力
+   - Webhook URL表示・コピー機能
+   - 設定手順ガイド
+   - グループ管理:
+     - 「監視中」/「未承認」ステータス表示
+     - チェックボックスで承認/解除
+     - 削除機能
+
+5. **ダッシュボード更新** (`app/[slug]/page.tsx`)
+   - `Task`型に`'line'`追加
+   - ソースフィルターにLINEボタン追加
+   - ソースラベル・色定義追加（エメラルド）
+   - 空メッセージにLINE追加
+
+6. **API更新**
+   - `/api/settings`: LINE設定の保存・取得対応
+   - `/api/rooms`: `source=line`クエリ対応
+   - `lib/email.ts`: `TaskInfo`型・ソースラベルにLINE追加
+
+#### 備考
+- **セキュリティ設計**:
+  - A社のボットがB社のグループに招待されるリスクを防ぐため、手動承認制を採用
+  - グループ参加時は自動で`is_active=false`で登録、管理者承認後に監視開始
+- **メッセージURL**: LINEはメッセージレベルのパーマリンクがないため、リンク機能は非対応
+- **デプロイ後**: `/api/init`を実行してDBマイグレーションが必要
+
+---
+
 <!--
 使い方:
 - 新しいセッションごとに「### セッション N」を追加

@@ -9,7 +9,7 @@ type Room = {
   room_id: string
   room_name: string
   is_active: boolean
-  source: 'chatwork' | 'teams' | 'lark' | 'slack'
+  source: 'chatwork' | 'teams' | 'lark' | 'slack' | 'line'
   workspace_id?: string
 }
 
@@ -33,6 +33,9 @@ type Settings = {
   lark_app_id: string
   lark_verification_token: string
   has_lark_settings: boolean
+  line_channel_secret: string
+  line_access_token: string
+  has_line_settings: boolean
   notification_emails: string[]
   notify_on_create: boolean
   notify_on_complete: boolean
@@ -41,7 +44,7 @@ type Settings = {
   has_resend_key: boolean
 }
 
-type Tab = 'general' | 'chatwork' | 'teams' | 'lark' | 'slack'
+type Tab = 'general' | 'chatwork' | 'teams' | 'lark' | 'slack' | 'line'
 
 export default function SettingsPage() {
   const { data: session, status: sessionStatus } = useSession()
@@ -65,6 +68,9 @@ export default function SettingsPage() {
     lark_app_id: '',
     lark_verification_token: '',
     has_lark_settings: false,
+    line_channel_secret: '',
+    line_access_token: '',
+    has_line_settings: false,
     notification_emails: [],
     notify_on_create: true,
     notify_on_complete: true,
@@ -96,6 +102,12 @@ export default function SettingsPage() {
   const [showLarkSecret, setShowLarkSecret] = useState(false)
   const [newLarkChatId, setNewLarkChatId] = useState('')
   const [newLarkChatName, setNewLarkChatName] = useState('')
+
+  // LINE用
+  const [lineChannelSecret, setLineChannelSecret] = useState('')
+  const [lineAccessToken, setLineAccessToken] = useState('')
+  const [showLineSecret, setShowLineSecret] = useState(false)
+  const [lineGroups, setLineGroups] = useState<Room[]>([])
 
   // Slack用
   const [slackWorkspaces, setSlackWorkspaces] = useState<SlackWorkspace[]>([])
@@ -216,6 +228,14 @@ export default function SettingsPage() {
           if (res.ok) {
             const data = await res.json()
             setSlackWorkspaces(Array.isArray(data) ? data : [])
+          }
+          break
+        }
+        case 'line': {
+          const res = await fetch('/api/rooms?source=line')
+          if (res.ok) {
+            const data = await res.json()
+            setLineGroups(Array.isArray(data) ? data : [])
           }
           break
         }
@@ -480,7 +500,7 @@ export default function SettingsPage() {
     }
   }
 
-  async function toggleRoom(roomId: string, isActive: boolean, source: 'chatwork' | 'teams' | 'lark') {
+  async function toggleRoom(roomId: string, isActive: boolean, source: 'chatwork' | 'teams' | 'lark' | 'line') {
     try {
       const res = await fetch('/api/rooms', {
         method: 'PATCH',
@@ -497,8 +517,12 @@ export default function SettingsPage() {
           setTeamsRooms(teamsRooms.map(room =>
             room.room_id === roomId ? { ...room, is_active: isActive } : room
           ))
-        } else {
+        } else if (source === 'lark') {
           setLarkRooms(larkRooms.map(room =>
+            room.room_id === roomId ? { ...room, is_active: isActive } : room
+          ))
+        } else if (source === 'line') {
+          setLineGroups(lineGroups.map(room =>
             room.room_id === roomId ? { ...room, is_active: isActive } : room
           ))
         }
@@ -657,6 +681,58 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveLineSettings() {
+    if (!lineChannelSecret && !settings.has_line_settings) {
+      setMessage('Channel Secretを入力してください')
+      return
+    }
+
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lineChannelSecret: lineChannelSecret || undefined,
+          lineAccessToken: lineAccessToken || undefined,
+        }),
+      })
+
+      if (res.ok) {
+        setMessage('LINE設定を保存しました')
+        setLineChannelSecret('')
+        setLineAccessToken('')
+        // 設定を再取得
+        fetchInitialData()
+      } else {
+        setMessage('保存に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteLineGroup(roomId: string) {
+    try {
+      const res = await fetch(`/api/rooms?roomId=${encodeURIComponent(roomId)}&source=line`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setMessage('グループを削除しました')
+        setLineGroups(lineGroups.filter(room => room.room_id !== roomId))
+      } else {
+        setMessage('削除に失敗しました')
+      }
+    } catch (error) {
+      setMessage('エラーが発生しました')
+    }
+  }
+
   function addEmail() {
     const email = newEmail.trim()
     if (!email) return
@@ -723,6 +799,10 @@ export default function SettingsPage() {
 
   const larkWebhookUrl = typeof window !== 'undefined' && companyWebhookToken
     ? `${window.location.origin}/api/webhook/lark/${companyWebhookToken}`
+    : ''
+
+  const lineWebhookUrl = typeof window !== 'undefined' && companyWebhookToken
+    ? `${window.location.origin}/api/webhook/line/${companyWebhookToken}`
     : ''
 
   // Slackは既存の方式（ワークスペースIDで識別）のまま
@@ -844,6 +924,23 @@ export default function SettingsPage() {
                 <span className="w-2 h-2 rounded-full bg-pink-500"></span>
               )}
               Slack
+            </span>
+          </button>
+          <button
+            onClick={() => handleTabChange('line')}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'line'
+                ? 'border-emerald-600 text-emerald-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              {tabLoading === 'line' ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              )}
+              LINE
             </span>
           </button>
         </nav>
@@ -1747,6 +1844,182 @@ export default function SettingsPage() {
                         )}
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* LINE タブ */}
+      {activeTab === 'line' && (
+        <div className="space-y-6">
+          {/* LINE API設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">LINE Messaging API設定</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              LINE Developersコンソールでチャネルを作成し、Messaging APIを設定してください。
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Channel Secret
+                </label>
+                {settings.has_line_settings && settings.line_channel_secret && (
+                  <p className="text-sm text-emerald-600 mb-2">
+                    現在のシークレット: {settings.line_channel_secret}
+                  </p>
+                )}
+                <div className="relative">
+                  <input
+                    type={showLineSecret ? 'text' : 'password'}
+                    value={lineChannelSecret}
+                    onChange={e => setLineChannelSecret(e.target.value)}
+                    placeholder={settings.has_line_settings ? '新しいシークレットを入力（変更する場合）' : 'Channel Secretを入力'}
+                    className="w-full px-4 py-2 pr-12 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={() => setShowLineSecret(true)}
+                    onMouseUp={() => setShowLineSecret(false)}
+                    onMouseLeave={() => setShowLineSecret(false)}
+                    onTouchStart={() => setShowLineSecret(true)}
+                    onTouchEnd={() => setShowLineSecret(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    title="押している間表示"
+                  >
+                    {showLineSecret ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                        <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  LINE Developers → チャネル基本設定 → Channel secret
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Channel Access Token
+                </label>
+                {settings.has_line_settings && settings.line_access_token && (
+                  <p className="text-sm text-emerald-600 mb-2">
+                    現在のトークン: {settings.line_access_token}
+                  </p>
+                )}
+                <input
+                  type="password"
+                  value={lineAccessToken}
+                  onChange={e => setLineAccessToken(e.target.value)}
+                  placeholder={settings.has_line_settings ? '新しいトークンを入力（変更する場合）' : 'Channel Access Tokenを入力'}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  LINE Developers → Messaging API → Channel access token（長期）
+                </p>
+              </div>
+
+              <button
+                onClick={saveLineSettings}
+                disabled={saving}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {saving ? '保存中...' : '設定を保存'}
+              </button>
+            </div>
+          </div>
+
+          {/* Webhook URL */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Webhook URL</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              このURLをLINE Developers → Messaging API → Webhook URL に設定してください。
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={lineWebhookUrl}
+                readOnly
+                className="flex-1 px-4 py-2 border rounded-lg bg-gray-50 text-sm"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(lineWebhookUrl)
+                  setMessage('URLをコピーしました')
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                コピー
+              </button>
+            </div>
+            <div className="mt-4 p-4 bg-emerald-50 rounded-lg">
+              <h3 className="text-sm font-medium text-emerald-800 mb-2">設定手順</h3>
+              <ol className="text-sm text-emerald-700 list-decimal list-inside space-y-1">
+                <li>LINE Developersで「Messaging API」チャネルを作成</li>
+                <li>Messaging API設定ページで上記URLをWebhook URLに設定</li>
+                <li>「Webhookの利用」をオンにする</li>
+                <li>Channel SecretとChannel Access Tokenを取得して上に入力</li>
+                <li>公式アカウントをグループに招待</li>
+                <li>下の「監視するグループ」で承認してタスク抽出を開始</li>
+              </ol>
+            </div>
+          </div>
+
+          {/* 監視グループ設定 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">監視するグループ</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              公式アカウントが参加しているグループが表示されます。
+              チェックを入れたグループのメッセージからタスクを抽出します。
+            </p>
+            <div className="p-4 bg-amber-50 rounded-lg mb-4">
+              <p className="text-sm text-amber-700">
+                <strong>セキュリティ:</strong> 新しくグループに参加した場合、デフォルトでは監視がオフになっています。
+                監視を開始するにはチェックを入れてください。
+              </p>
+            </div>
+
+            {lineGroups.length === 0 ? (
+              <p className="text-gray-500">
+                グループがありません。公式アカウントをグループに招待すると、ここに表示されます。
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {lineGroups.map(group => (
+                  <div
+                    key={group.room_id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={group.is_active}
+                      onChange={e => toggleRoom(group.room_id, e.target.checked, 'line')}
+                      className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500"
+                    />
+                    <span className="flex-1 text-gray-900">{group.room_name}</span>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      group.is_active
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {group.is_active ? '監視中' : '未承認'}
+                    </span>
+                    <button
+                      onClick={() => deleteLineGroup(group.room_id)}
+                      className="px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                    >
+                      削除
+                    </button>
                   </div>
                 ))}
               </div>

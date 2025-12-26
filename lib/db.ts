@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres'
 
-export type Source = 'chatwork' | 'teams' | 'lark' | 'slack'
+export type Source = 'chatwork' | 'teams' | 'lark' | 'slack' | 'line'
 export type UserType = 'system_admin' | 'admin' | 'user'
 
 export type SlackWorkspace = {
@@ -115,6 +115,16 @@ export async function initDatabase() {
   await sql`
     ALTER TABLE settings
     ADD COLUMN IF NOT EXISTS lark_encrypt_key TEXT
+  `
+
+  // LINE設定カラム追加
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS line_channel_secret TEXT
+  `
+  await sql`
+    ALTER TABLE settings
+    ADD COLUMN IF NOT EXISTS line_access_token TEXT
   `
 
   // Rooms テーブル
@@ -398,6 +408,26 @@ export async function saveLarkSettings(larkSettings: {
   }
 }
 
+export async function saveLineSettings(lineSettings: {
+  channelSecret?: string
+  accessToken?: string
+}, companyId?: number) {
+  const existing = await getSettings(companyId)
+  if (existing) {
+    await sql`
+      UPDATE settings
+      SET line_channel_secret = COALESCE(${lineSettings.channelSecret || null}, line_channel_secret),
+          line_access_token = COALESCE(${lineSettings.accessToken || null}, line_access_token)
+      WHERE id = ${existing.id}
+    `
+  } else {
+    await sql`
+      INSERT INTO settings (line_channel_secret, line_access_token, company_id)
+      VALUES (${lineSettings.channelSecret || null}, ${lineSettings.accessToken || null}, ${companyId || null})
+    `
+  }
+}
+
 // 通知設定
 export type NotificationSettings = {
   notification_emails: string[]
@@ -532,11 +562,18 @@ export async function upsertRoom(roomId: string, roomName: string, source: Sourc
   }
 }
 
-export async function createRoom(roomId: string, roomName: string, source: Source, companyId?: number) {
+export async function createRoom(options: {
+  roomId: string
+  roomName: string
+  source: Source
+  isActive?: boolean
+  companyId?: number
+}) {
+  const { roomId, roomName, source, isActive = true, companyId } = options
   if (companyId) {
     const result = await sql`
       INSERT INTO rooms (room_id, room_name, source, is_active, company_id)
-      VALUES (${roomId}, ${roomName}, ${source}, true, ${companyId})
+      VALUES (${roomId}, ${roomName}, ${source}, ${isActive}, ${companyId})
       ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}, company_id = ${companyId}
       RETURNING *
     `
@@ -544,7 +581,7 @@ export async function createRoom(roomId: string, roomName: string, source: Sourc
   }
   const result = await sql`
     INSERT INTO rooms (room_id, room_name, source, is_active)
-    VALUES (${roomId}, ${roomName}, ${source}, true)
+    VALUES (${roomId}, ${roomName}, ${source}, ${isActive})
     ON CONFLICT (room_id, source) DO UPDATE SET room_name = ${roomName}
     RETURNING *
   `

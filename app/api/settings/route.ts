@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getSettings, saveSettings, saveTeamsSettings, saveLarkSettings, getNotificationSettings, saveNotificationSettings } from '@/lib/db'
+import { getSettings, saveSettings, saveTeamsSettings, saveLarkSettings, saveLineSettings, getNotificationSettings, saveNotificationSettings } from '@/lib/db'
 
 export async function GET() {
   try {
@@ -21,6 +21,9 @@ export async function GET() {
         lark_app_id: '',
         lark_verification_token: '',
         has_lark_settings: false,
+        line_channel_secret: '',
+        line_access_token: '',
+        has_line_settings: false,
         notification_emails: notificationSettings.notification_emails,
         notify_on_create: notificationSettings.notify_on_create,
         notify_on_complete: notificationSettings.notify_on_complete,
@@ -46,6 +49,13 @@ export async function GET() {
         ? '****' + settings.lark_verification_token.slice(-4)
         : '',
       has_lark_settings: Boolean(settings.lark_app_id && settings.lark_verification_token),
+      line_channel_secret: settings.line_channel_secret
+        ? '****' + settings.line_channel_secret.slice(-4)
+        : '',
+      line_access_token: settings.line_access_token
+        ? '****' + settings.line_access_token.slice(-4)
+        : '',
+      has_line_settings: Boolean(settings.line_channel_secret),
       notification_emails: notificationSettings.notification_emails,
       notify_on_create: notificationSettings.notify_on_create,
       notify_on_complete: notificationSettings.notify_on_complete,
@@ -78,6 +88,8 @@ export async function POST(request: Request) {
       larkAppSecret,
       larkVerificationToken,
       larkEncryptKey,
+      lineChannelSecret,
+      lineAccessToken,
       notificationEmails,
       notifyOnCreate,
       notifyOnComplete,
@@ -107,6 +119,14 @@ export async function POST(request: Request) {
         appSecret: larkAppSecret,
         verificationToken: larkVerificationToken,
         encryptKey: larkEncryptKey,
+      }, companyId)
+    }
+
+    // LINE設定の保存
+    if (lineChannelSecret !== undefined || lineAccessToken !== undefined) {
+      await saveLineSettings({
+        channelSecret: lineChannelSecret,
+        accessToken: lineAccessToken,
       }, companyId)
     }
 

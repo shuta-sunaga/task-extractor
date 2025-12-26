@@ -18,6 +18,16 @@ export async function GET(request: Request) {
       return NextResponse.json(rooms)
     }
 
+    if (source === 'lark') {
+      const rooms = await getRoomsBySource('lark', companyId)
+      return NextResponse.json(rooms)
+    }
+
+    if (source === 'line') {
+      const rooms = await getRoomsBySource('line', companyId)
+      return NextResponse.json(rooms)
+    }
+
     if (source === 'chatwork') {
       // Chatwork APIトークンがあれば、最新のルーム一覧を取得してDBを更新
       const settings = await getSettings(companyId)
@@ -88,7 +98,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const room = await createRoom(roomId, roomName, source, companyId)
+    const room = await createRoom({ roomId, roomName, source, companyId })
     return NextResponse.json(room, { status: 201 })
   } catch (error) {
     console.error('Create room error:', error)
