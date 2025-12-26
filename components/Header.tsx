@@ -57,6 +57,12 @@ export function Header() {
                     >
                       ダッシュボード
                     </Link>
+                    <Link
+                      href={`/${companySlug}/usage`}
+                      className={`text-white/90 hover:text-white font-medium transition-colors ${pathname === `/${companySlug}/usage` ? 'text-white underline underline-offset-4' : ''}`}
+                    >
+                      利用方法
+                    </Link>
                     {isAdmin && (
                       <>
                         <Link
