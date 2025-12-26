@@ -187,9 +187,14 @@ export default function Dashboard() {
         ))
         setEditingMemoId(null)
         setMemoText('')
+      } else {
+        const errorData = await res.json().catch(() => ({}))
+        console.error('Failed to save memo:', res.status, errorData)
+        alert(`メモの保存に失敗しました: ${errorData.error || res.statusText}`)
       }
     } catch (error) {
       console.error('Failed to save memo:', error)
+      alert('メモの保存中にエラーが発生しました')
     } finally {
       setSavingMemo(false)
     }
